@@ -55,6 +55,36 @@ export async function sendPushNotification(
   }
 }
 
+/** Notification shape used by budget alerts (heading/content) */
+type BudgetAlertPushPayload = {
+  heading?: string;
+  content?: string;
+  title?: string;
+  message?: string;
+  url?: string;
+  icon?: string;
+  badge?: string;
+  data?: Record<string, unknown>;
+};
+
+/**
+ * Send push notification to a user. Accepts either title/message or heading/content.
+ */
+export async function sendPushNotificationToUser(
+  playerId: string,
+  notification: BudgetAlertPushPayload
+): Promise<void> {
+  const payload: PushNotificationData = {
+    title: notification.heading ?? notification.title ?? "Notification",
+    message: notification.content ?? notification.message ?? "",
+    url: notification.url,
+    icon: notification.icon,
+    badge: notification.badge,
+    data: notification.data,
+  };
+  return sendPushNotification(playerId, payload);
+}
+
 /**
  * Send push notification to multiple users
  */
