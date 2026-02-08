@@ -140,12 +140,12 @@ export async function GET(
     });
 
     const taskSpending = completedTasks.reduce(
-      (sum, task) => sum + (task.actualCost || 0),
+      (sum: number, task: { actualCost: number | null }) => sum + (task.actualCost || 0),
       0
     );
 
     const projectSpending = diyProjects.reduce(
-      (sum, project) => sum + (project.actualCost || 0),
+      (sum: number, project: { actualCost: number | null }) => sum + (project.actualCost || 0),
       0
     );
 
