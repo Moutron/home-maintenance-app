@@ -76,7 +76,7 @@ export async function GET(
       select: { id: true },
     });
 
-    const homeIds = homes.map((h) => h.id);
+    const homeIds = homes.map((h: { id: string }) => h.id);
 
     const completedTasks = await prisma.completedTask.findMany({
       where: {
