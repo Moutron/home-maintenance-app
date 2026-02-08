@@ -1,0 +1,748 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String             @id @default(cuid())
+  clerkId              String             @unique
+  email                String             @unique
+  subscriptionTier     SubscriptionTier   @default(FREE)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  completedTasks       CompletedTask[]
+  contractorReviews    ContractorReview[]
+  diyProjects          DiyProject[]
+  homes                Home[]
+  leadRequests         LeadRequest[]
+  toolInventory        ToolInventory[]
+  customTaskTemplates  TaskTemplate[]
+  budgetPlans          BudgetPlan[]
+  budgetAlerts          BudgetAlert[]
+  pushSubscriptions    PushSubscription[]
+}
+
+model Home {
+  id                 String               @id @default(cuid())
+  userId             String
+  address            String
+  city               String
+  state              String
+  zipCode            String
+  yearBuilt          Int
+  squareFootage      Int?
+  lotSize            Float?
+  homeType           String
+  climateZone        String?
+  heatingDegreeDays  Int?
+  coolingDegreeDays  Int?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  averageRainfall    Float?
+  averageSnowfall    Float?
+  stormFrequency     String?
+  windZone           String?
+  appliances         Appliance[]
+  diyProjects        DiyProject[]
+  exteriorFeatures   ExteriorFeature[]
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  systems            HomeSystem[]
+  interiorFeatures   InteriorFeature[]
+  leadRequests       LeadRequest[]
+  maintenanceHistory MaintenanceHistory[]
+  tasks              MaintenanceTask[]
+
+  @@index([userId])
+  @@index([state, zipCode])
+}
+
+model HomeSystem {
+  id               String     @id @default(cuid())
+  homeId           String
+  systemType       SystemType
+  brand            String?
+  model            String?
+  installDate      DateTime?
+  expectedLifespan Int?
+  notes            String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  capacity         String?
+  condition        String?
+  lastInspection   DateTime?
+  material         String?
+  stormResistance  String?
+  home             Home       @relation(fields: [homeId], references: [id], onDelete: Cascade)
+
+  @@index([homeId])
+  @@index([systemType])
+}
+
+model TaskTemplate {
+  id                 String            @id @default(cuid())
+  name               String
+  description        String
+  category           TaskCategory
+  baseFrequency      TaskFrequency
+  frequencyRules     Json?
+  climateRules       Json?
+  ageRules           Json?
+  systemRules        Json?
+  educationalContent Json?
+  diyDifficulty      String?
+  costRangeMin       Float?
+  costRangeMax       Float?
+  importance         String?
+  season             String?
+  isActive           Boolean           @default(true)
+  userId             String?           // If set, this is a user-created custom template
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  tasks              MaintenanceTask[]
+  user               User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@index([isActive])
+  @@index([userId])
+}
+
+model MaintenanceTask {
+  id              String            @id @default(cuid())
+  homeId          String
+  templateId      String?
+  name            String
+  description     String
+  category        TaskCategory
+  frequency       TaskFrequency
+  nextDueDate     DateTime
+  completed       Boolean           @default(false)
+  completedDate   DateTime?
+  costEstimate    Float?
+  notes           String?
+  aiExplanation   String?
+  priority        String?
+  dependsOnTaskId String?
+  relatedItemId   String?
+  relatedItemType String?
+  snoozedUntil    DateTime?         // Snooze functionality - task hidden until this date
+  customRecurrence Json?             // Custom recurrence pattern: { interval: number, unit: "days" | "weeks" | "months" }
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  completedTasks  CompletedTask[]
+  leadRequests    LeadRequest[]
+  dependsOn       MaintenanceTask?  @relation("TaskDependencies", fields: [dependsOnTaskId], references: [id])
+  dependentTasks  MaintenanceTask[] @relation("TaskDependencies")
+  home            Home              @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  template        TaskTemplate?     @relation(fields: [templateId], references: [id])
+
+  @@index([homeId])
+  @@index([nextDueDate])
+  @@index([completed])
+  @@index([dependsOnTaskId])
+  @@index([snoozedUntil])
+}
+
+model CompletedTask {
+  id             String          @id @default(cuid())
+  taskId         String
+  userId         String
+  completedDate  DateTime        @default(now())
+  actualCost     Float?
+  notes          String?
+  photos         String[]
+  contractorUsed String?
+  createdAt      DateTime        @default(now())
+  task           MaintenanceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([taskId])
+  @@index([completedDate])
+}
+
+model Contractor {
+  id              String             @id @default(cuid())
+  clerkId         String             @unique
+  email           String             @unique
+  businessName    String
+  contactName     String
+  phone           String
+  licenseNumber   String?
+  services        String[]
+  coverageZips    String[]
+  coverageRadius  Int?
+  tier            ContractorTier     @default(BASIC)
+  stripeAccountId String?
+  rating          Float              @default(0)
+  reviewCount     Int                @default(0)
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  reviews         ContractorReview[]
+  leadRequests    LeadRequest[]
+
+  @@index([tier])
+  @@index([isActive])
+}
+
+model LeadRequest {
+  id          String           @id @default(cuid())
+  userId      String
+  homeId      String
+  taskId      String?
+  serviceType String
+  description String
+  timeline    String?
+  photos      String[]
+  status      LeadStatus       @default(PENDING)
+  claimedBy   String?
+  claimedAt   DateTime?
+  completedAt DateTime?
+  leadFee     Float?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  contractor  Contractor?      @relation(fields: [claimedBy], references: [id])
+  home        Home             @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  task        MaintenanceTask? @relation(fields: [taskId], references: [id])
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([claimedBy])
+  @@index([createdAt])
+}
+
+model ContractorReview {
+  id            String     @id @default(cuid())
+  userId        String
+  contractorId  String
+  leadRequestId String?
+  rating        Int
+  comment       String?
+  isVerified    Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  contractor    Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([contractorId])
+  @@index([rating])
+  @@index([isVerified])
+}
+
+model Appliance {
+  id                 String               @id @default(cuid())
+  homeId             String
+  applianceType      ApplianceType
+  brand              String?
+  model              String?
+  serialNumber       String?
+  installDate        DateTime?
+  warrantyExpiry     DateTime?
+  expectedLifespan   Int?
+  lastServiceDate    DateTime?
+  usageFrequency     String?
+  notes              String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  home               Home                 @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  maintenanceHistory MaintenanceHistory[]
+
+  @@index([homeId])
+  @@index([applianceType])
+}
+
+model ExteriorFeature {
+  id                 String               @id @default(cuid())
+  homeId             String
+  featureType        ExteriorFeatureType
+  material           String?
+  brand              String?
+  installDate        DateTime?
+  warrantyExpiry     DateTime?
+  expectedLifespan   Int?
+  lastServiceDate    DateTime?
+  squareFootage      Float?
+  notes              String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  home               Home                 @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  maintenanceHistory MaintenanceHistory[]
+
+  @@index([homeId])
+  @@index([featureType])
+}
+
+model InteriorFeature {
+  id                 String               @id @default(cuid())
+  homeId             String
+  featureType        InteriorFeatureType
+  material           String?
+  brand              String?
+  installDate        DateTime?
+  warrantyExpiry     DateTime?
+  expectedLifespan   Int?
+  lastServiceDate    DateTime?
+  squareFootage      Float?
+  room               String?
+  notes              String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  home               Home                 @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  maintenanceHistory MaintenanceHistory[]
+
+  @@index([homeId])
+  @@index([featureType])
+}
+
+model MaintenanceHistory {
+  id                String           @id @default(cuid())
+  homeId            String
+  applianceId       String?
+  exteriorFeatureId String?
+  interiorFeatureId String?
+  systemId          String?
+  serviceDate       DateTime         @default(now())
+  serviceType       String
+  description       String
+  cost              Float?
+  contractorName    String?
+  contractorPhone   String?
+  photos            String[]
+  receipts          String[]
+  warrantyInfo      String?
+  notes             String?
+  nextServiceDue    DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  appliance         Appliance?       @relation(fields: [applianceId], references: [id], onDelete: Cascade)
+  exteriorFeature   ExteriorFeature? @relation(fields: [exteriorFeatureId], references: [id], onDelete: Cascade)
+  home              Home             @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  interiorFeature   InteriorFeature? @relation(fields: [interiorFeatureId], references: [id], onDelete: Cascade)
+
+  @@index([homeId])
+  @@index([applianceId])
+  @@index([exteriorFeatureId])
+  @@index([interiorFeatureId])
+  @@index([serviceDate])
+}
+
+model PropertyCache {
+  id           String   @id @default(cuid())
+  address      String
+  city         String
+  state        String
+  zipCode      String
+  cacheKey     String   @unique
+  propertyData Json
+  source       String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([cacheKey])
+  @@index([expiresAt])
+  @@index([address, city, state, zipCode])
+}
+
+model ZipCodeCache {
+  id          String   @id @default(cuid())
+  zipCode     String   @unique
+  city        String?
+  state       String
+  weatherData Json
+  climateData Json?
+  source      String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([zipCode])
+  @@index([expiresAt])
+  @@index([state, zipCode])
+}
+
+model DiyProject {
+  id                      String            @id @default(cuid())
+  userId                  String
+  homeId                  String
+  name                    String
+  description             String?
+  category                ProjectCategory
+  status                  ProjectStatus     @default(NOT_STARTED)
+  difficulty              ProjectDifficulty
+  estimatedHours          Int?
+  actualHours             Float?
+  estimatedCost           Float?
+  actualCost              Float?
+  budget                  Float?
+  targetStartDate         DateTime?
+  targetEndDate           DateTime?
+  actualStartDate         DateTime?
+  actualEndDate           DateTime?
+  linkedTaskId            String?
+  linkedSystemId          String?
+  linkedApplianceId       String?
+  linkedExteriorFeatureId String?
+  linkedInteriorFeatureId String?
+  permitRequired          Boolean           @default(false)
+  permitInfo              String?
+  satisfactionRating      Int?
+  wouldDoAgain            Boolean?
+  notes                   String?
+  lessonsLearned          String?
+  templateId              String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  home                    Home              @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  template                ProjectTemplate?  @relation(fields: [templateId], references: [id])
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materials               ProjectMaterial[]
+  photos                  ProjectPhoto[]
+  steps                   ProjectStep[]
+  tools                   ProjectTool[]
+
+  @@index([userId])
+  @@index([homeId])
+  @@index([status])
+  @@index([category])
+  @@index([templateId])
+}
+
+model ProjectStep {
+  id              String     @id @default(cuid())
+  projectId       String
+  stepNumber      Int
+  name            String
+  description     String
+  instructions    String
+  estimatedHours  Float?
+  actualHours     Float?
+  status          String     @default("not_started")
+  completedAt     DateTime?
+  notes           String?
+  dependsOnStepId String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  project         DiyProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([stepNumber])
+}
+
+model ProjectMaterial {
+  id          String     @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  quantity    Float
+  unit        String
+  unitPrice   Float?
+  totalPrice  Float?
+  vendor      String?
+  vendorUrl   String?
+  purchased   Boolean    @default(false)
+  purchasedAt DateTime?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  project     DiyProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ProjectTool {
+  id           String     @id @default(cuid())
+  projectId    String
+  name         String
+  description  String?
+  owned        Boolean    @default(false)
+  rentalCost   Float?
+  rentalDays   Int?
+  purchaseCost Float?
+  purchased    Boolean    @default(false)
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  project      DiyProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ProjectPhoto {
+  id         String     @id @default(cuid())
+  projectId  String
+  stepId     String?
+  url        String
+  caption    String?
+  isBefore   Boolean    @default(false)
+  isAfter    Boolean    @default(false)
+  uploadedAt DateTime   @default(now())
+  project    DiyProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([stepId])
+}
+
+model ProjectTemplate {
+  id               String            @id @default(cuid())
+  name             String
+  description      String
+  category         ProjectCategory
+  difficulty       ProjectDifficulty
+  estimatedHours   Int?
+  estimatedCostMin Float?
+  estimatedCostMax Float?
+  skillLevel       String?
+  permitRequired   Boolean           @default(false)
+  permitInfo       String?
+  safetyNotes      String?
+  videoUrl         String?
+  guideUrl         String?
+  commonMistakes   String[]
+  steps            Json
+  defaultMaterials Json
+  defaultTools     Json
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  projects         DiyProject[]
+
+  @@index([category])
+  @@index([difficulty])
+  @@index([isActive])
+}
+
+model ToolInventory {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  description   String?
+  category      String?
+  brand         String?
+  model         String?
+  purchaseDate  DateTime?
+  purchasePrice Float?
+  condition     String?
+  location      String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([category])
+  @@index([name])
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
+
+enum SystemType {
+  HVAC
+  ROOF
+  WATER_HEATER
+  PLUMBING
+  ELECTRICAL
+  APPLIANCE
+  EXTERIOR
+  LANDSCAPING
+  POOL
+  DECK
+  FENCE
+  OTHER
+}
+
+enum ApplianceType {
+  REFRIGERATOR
+  DISHWASHER
+  WASHER
+  DRYER
+  OVEN
+  RANGE
+  MICROWAVE
+  GARBAGE_DISPOSAL
+  GARBAGE_COMPACTOR
+  ICE_MAKER
+  WINE_COOLER
+  OTHER
+}
+
+enum ExteriorFeatureType {
+  DECK
+  FENCE
+  POOL
+  SPRINKLER_SYSTEM
+  DRIVEWAY
+  PATIO
+  SIDING
+  GUTTERS
+  WINDOWS
+  DOORS
+  GARAGE_DOOR
+  FOUNDATION
+  OTHER
+}
+
+enum InteriorFeatureType {
+  CARPET
+  HARDWOOD_FLOOR
+  TILE_FLOOR
+  LAMINATE_FLOOR
+  VINYL_FLOOR
+  WINDOWS
+  DOORS
+  CABINETS
+  COUNTERTOPS
+  PAINT
+  WALLPAPER
+  OTHER
+}
+
+enum TaskCategory {
+  HVAC
+  PLUMBING
+  EXTERIOR
+  STRUCTURAL
+  LANDSCAPING
+  APPLIANCE
+  SAFETY
+  ELECTRICAL
+  OTHER
+}
+
+enum TaskFrequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  BIANNUAL
+  ANNUAL
+  SEASONAL
+  AS_NEEDED
+}
+
+enum ProjectStatus {
+  NOT_STARTED
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
+
+enum ProjectCategory {
+  HVAC
+  PLUMBING
+  ELECTRICAL
+  EXTERIOR
+  INTERIOR
+  LANDSCAPING
+  APPLIANCE
+  STRUCTURAL
+  OTHER
+}
+
+enum ContractorTier {
+  BASIC
+  FEATURED
+  PREMIUM
+}
+
+enum LeadStatus {
+  PENDING
+  CLAIMED
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum BudgetAlertType {
+  APPROACHING_LIMIT
+  EXCEEDED_LIMIT
+  PROJECT_OVER_BUDGET
+}
+
+enum BudgetAlertStatus {
+  PENDING
+  SENT
+  DISMISSED
+}
+
+model BudgetPlan {
+  id                String        @id @default(cuid())
+  userId            String
+  name              String
+  period            BudgetPeriod
+  amount            Float
+  startDate         DateTime
+  endDate           DateTime
+  category          String?       // Optional category filter (HVAC, PLUMBING, etc.)
+  homeId            String?       // Optional home filter
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alerts            BudgetAlert[]
+
+  @@index([userId])
+  @@index([period])
+  @@index([startDate, endDate])
+  @@index([isActive])
+}
+
+model BudgetAlert {
+  id                String            @id @default(cuid())
+  userId            String
+  budgetPlanId      String?
+  projectId         String?            // DiyProject ID if project-specific
+  alertType         BudgetAlertType
+  status            BudgetAlertStatus  @default(PENDING)
+  thresholdPercent Float?             // e.g., 80 for 80% threshold
+  message           String
+  sentAt            DateTime?
+  dismissedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budgetPlan        BudgetPlan?       @relation(fields: [budgetPlanId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([alertType])
+  @@index([createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  playerId  String   @unique // OneSignal player ID
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([playerId])
+}

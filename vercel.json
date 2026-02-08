@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/warranties/check-expiring",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
+

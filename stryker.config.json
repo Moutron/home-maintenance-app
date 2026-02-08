@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "reporters": ["html", "clear-text", "progress"],
+  "testRunner": "vitest",
+  "testRunnerNodeArgs": ["--no-warnings"],
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "lib/utils/task-recurrence.ts",
+    "app/api/dashboard/route.ts",
+    "app/api/tasks/route.ts",
+    "!lib/utils/property-enrichment.ts",
+    "!**/*.test.ts",
+    "!**/*.spec.ts",
+    "!**/*.d.ts",
+    "!**/node_modules/**",
+    "!**/dist/**",
+    "!**/.next/**",
+    "!**/components/**",
+    "!**/app/(dashboard)/**"
+  ],
+  "mutator": {
+    "excludedMutations": [
+      "StringLiteral",
+      "TemplateLiteral"
+    ]
+  },
+  "checkers": [],
+  "vitest": {
+    "configFile": "vitest.config.mts"
+  },
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": 75
+  },
+  "timeoutMS": 15000,
+  "logLevel": "info",
+  "fileLogLevel": "warn",
+  "disableTypeChecks": true
+}
+
