@@ -73,16 +73,16 @@ export async function GET(request: NextRequest) {
     });
 
     // Calculate actual costs for each project
-    const projectsWithCosts = projects.map((project) => {
+    const projectsWithCosts = projects.map((project: (typeof projects)[number]) => {
       // Calculate from materials
       const materialCost = project.materials
-        .filter((m) => m.purchased && m.totalPrice)
-        .reduce((sum, m) => sum + (m.totalPrice || 0), 0);
+        .filter((m: { purchased: boolean; totalPrice: number | null }) => m.purchased && m.totalPrice)
+        .reduce((sum: number, m: { totalPrice: number | null }) => sum + (m.totalPrice || 0), 0);
 
       // Calculate from tools
       const toolCost = project.tools
-        .filter((t) => !t.owned && t.purchased)
-        .reduce((sum, t) => {
+        .filter((t: { owned: boolean; purchased: boolean }) => !t.owned && t.purchased)
+        .reduce((sum: number, t: { rentalCost: number | null; rentalDays: number | null; purchaseCost: number | null }) => {
           if (t.rentalCost && t.rentalDays) {
             return sum + t.rentalCost * t.rentalDays;
           }
@@ -118,15 +118,15 @@ export async function GET(request: NextRequest) {
 
     // Calculate totals
     const totalBudget = projectsWithCosts.reduce(
-      (sum, p) => sum + p.budget,
+      (sum: number, p: { budget: number }) => sum + p.budget,
       0
     );
     const totalSpent = projectsWithCosts.reduce(
-      (sum, p) => sum + p.actualCost,
+      (sum: number, p: { actualCost: number }) => sum + p.actualCost,
       0
     );
     const totalRemaining = totalBudget - totalSpent;
-    const projectsOverBudget = projectsWithCosts.filter((p) => p.isOverBudget)
+    const projectsOverBudget = projectsWithCosts.filter((p: { isOverBudget: boolean }) => p.isOverBudget)
       .length;
 
     return NextResponse.json({

@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
-    const homeIds = homes.map((h) => h.id);
+    const homeIds = homes.map((h: { id: string }) => h.id);
 
     if (homeIds.length === 0) {
       return NextResponse.json({ sent: 0, message: "No homes found" });
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     for (const days of daysAhead) {
       const tasksForDay = tasksByDays[days] || [];
       if (tasksForDay.length > 0) {
-        const reminderData = tasksForDay.map((task) => ({
+        const reminderData = tasksForDay.map((task: (typeof tasks)[number]) => ({
           taskName: task.name,
           taskDescription: task.description,
           dueDate: task.nextDueDate.toISOString(),

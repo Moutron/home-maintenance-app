@@ -143,9 +143,11 @@ export async function PATCH(
       const allSteps = await prisma.projectStep.findMany({
         where: { projectId: id },
       });
-      const totalActualHours = allSteps.reduce((sum, s) => {
-        return sum + (s.id === stepId ? validatedData.actualHours! : (s.actualHours || 0));
-      }, 0);
+      const totalActualHours = allSteps.reduce(
+        (sum: number, s: { id: string; actualHours: number | null }) =>
+          sum + (s.id === stepId ? validatedData.actualHours! : (s.actualHours || 0)),
+        0
+      );
       
       await prisma.diyProject.update({
         where: { id },

@@ -163,6 +163,26 @@ If anything fails, check **Deployments** → latest deployment → **Building** 
 
 ---
 
+## Why Vercel Build Can Fail (and How to Avoid It)
+
+Vercel runs **strict TypeScript** during `npm run build`. If any callback parameter is inferred as `any` (e.g. in `.map((h) => ...)` or `.reduce((sum, x) => ...)`), the build fails with "Parameter 'x' implicitly has an 'any' type."
+
+**Catch it before pushing:**
+
+1. **Run the same build locally:**  
+   `npm run build`  
+   If it passes locally, it should pass on Vercel.
+
+2. **Fix implicit `any` in API routes:**  
+   Add explicit types to callback parameters, e.g.  
+   `homes.map((h) => h.id)` → `homes.map((h: { id: string }) => h.id)`  
+   `arr.reduce((sum, x) => sum + x.cost, 0)` → `arr.reduce((sum: number, x: { cost: number | null }) => sum + (x.cost || 0), 0)`.
+
+3. **CI:**  
+   The repo’s GitHub Actions workflow runs `npm run build` on push/PR; if that job passes, Vercel’s build should too.
+
+---
+
 ## What Happens Next
 
 - **Every push** to the connected branch (e.g. `main`) will trigger a new deploy.

@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       select: { id: true },
     });
 
-    const homeIds = homes.map((h) => h.id);
+    const homeIds = homes.map((h: { id: string }) => h.id);
 
     if (homeIds.length === 0) {
       return NextResponse.json({
@@ -112,12 +112,12 @@ export async function GET(request: NextRequest) {
 
     // Calculate totals
     const totalSpent = completedTasks.reduce(
-      (sum, task) => sum + (task.actualCost || 0),
+      (sum: number, task: { actualCost: number | null }) => sum + (task.actualCost || 0),
       0
     );
 
     const totalEstimated = upcomingTasks.reduce(
-      (sum, task) => sum + (task.costEstimate || 0),
+      (sum: number, task: { costEstimate: number | null }) => sum + (task.costEstimate || 0),
       0
     );
 
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
       const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-      const monthTasks = completedTasks.filter((completedTask) => {
+      const monthTasks = completedTasks.filter((completedTask: { completedDate: Date }) => {
         if (!completedTask.completedDate) return false;
         const taskDate = new Date(completedTask.completedDate);
         return taskDate >= monthStart && taskDate <= monthEnd;

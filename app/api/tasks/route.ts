@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       select: { id: true },
     });
 
-    const homeIds = homes.map((h) => h.id);
+    const homeIds = homes.map((h: { id: string }) => h.id);
 
     if (homeIds.length === 0) {
       return NextResponse.json({ tasks: [] });

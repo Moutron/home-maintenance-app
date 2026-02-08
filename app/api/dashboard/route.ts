@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       select: { id: true },
     });
 
-    const homeIds = homes.map((h) => h.id);
+    const homeIds = homes.map((h: { id: string }) => h.id);
 
     if (homeIds.length === 0) {
       return NextResponse.json({
@@ -235,32 +235,41 @@ export async function GET(request: NextRequest) {
     ).length;
 
     const totalTasks = allTasks.length;
-    const completedTasks = allTasks.filter((t) => t.completed).length;
+    const completedTasks = allTasks.filter((t: { completed: boolean }) => t.completed).length;
     const completionRate =
       totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     // Calculate spending
-    const totalSpending = history.reduce((sum, record) => sum + (record.cost || 0), 0);
+    const totalSpending = history.reduce(
+      (sum: number, record: { cost: number | null }) => sum + (record.cost || 0),
+      0
+    );
 
     const monthlySpending = history
       .filter(
-        (record) =>
+        (record: { serviceDate: Date }) =>
           new Date(record.serviceDate) >= startOfCurrentMonth &&
           new Date(record.serviceDate) <= endOfCurrentMonth
       )
-      .reduce((sum, record) => sum + (record.cost || 0), 0);
+      .reduce(
+        (sum: number, record: { cost: number | null }) => sum + (record.cost || 0),
+        0
+      );
 
     const yearlySpending = history
       .filter(
-        (record) =>
+        (record: { serviceDate: Date }) =>
           new Date(record.serviceDate) >= startOfCurrentYear &&
           new Date(record.serviceDate) <= endOfCurrentYear
       )
-      .reduce((sum, record) => sum + (record.cost || 0), 0);
+      .reduce(
+        (sum: number, record: { cost: number | null }) => sum + (record.cost || 0),
+        0
+      );
 
     // Spending by category (from tasks with cost estimates)
     const spendingByCategory: Record<string, number> = {};
-    allTasks.forEach((task) => {
+    allTasks.forEach((task: { costEstimate: number | null; category: string }) => {
       if (task.costEstimate) {
         spendingByCategory[task.category] =
           (spendingByCategory[task.category] || 0) + task.costEstimate;
@@ -274,11 +283,14 @@ export async function GET(request: NextRequest) {
       const monthEnd = endOfMonth(monthStart);
       const monthSpending = history
         .filter(
-          (record) =>
+          (record: { serviceDate: Date }) =>
             new Date(record.serviceDate) >= monthStart &&
             new Date(record.serviceDate) <= monthEnd
         )
-        .reduce((sum, record) => sum + (record.cost || 0), 0);
+        .reduce(
+          (sum: number, record: { cost: number | null }) => sum + (record.cost || 0),
+          0
+        );
 
       monthlySpendingData.push({
         month: monthStart.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
@@ -295,11 +307,14 @@ export async function GET(request: NextRequest) {
       const yearEnd = new Date(year, 11, 31);
       const yearSpending = history
         .filter(
-          (record) =>
+          (record: { serviceDate: Date }) =>
             new Date(record.serviceDate) >= yearStart &&
             new Date(record.serviceDate) <= yearEnd
         )
-        .reduce((sum, record) => sum + (record.cost || 0), 0);
+        .reduce(
+          (sum: number, record: { cost: number | null }) => sum + (record.cost || 0),
+          0
+        );
 
       yearlySpendingData.push({
         year: year.toString(),
@@ -406,7 +421,7 @@ export async function GET(request: NextRequest) {
       take: 5,
     });
 
-    recentCompletedTasks.forEach((completed) => {
+    recentCompletedTasks.forEach((completed: (typeof recentCompletedTasks)[number]) => {
       recentActivity.push({
         type: "task_completed",
         title: completed.task.name,
@@ -436,7 +451,7 @@ export async function GET(request: NextRequest) {
       take: 5,
     });
 
-    recentHistory.forEach((record) => {
+    recentHistory.forEach((record: (typeof recentHistory)[number]) => {
       recentActivity.push({
         type: "maintenance_recorded",
         title: record.description,
@@ -449,7 +464,7 @@ export async function GET(request: NextRequest) {
 
     // Sort by date and take most recent 10
     recentActivity.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      (a: { date: Date }, b: { date: Date }) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
     // Get home details for display
@@ -474,7 +489,7 @@ export async function GET(request: NextRequest) {
         yearlySpending,
         completionRate,
         totalTasks,
-        activeTasks: allTasks.filter((t) => !t.completed).length,
+        activeTasks: allTasks.filter((t: { completed: boolean }) => !t.completed).length,
       },
       alerts: {
         overdueTasks: overdueTasks.slice(0, 10).map((task) => ({
