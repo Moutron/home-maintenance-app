@@ -63,8 +63,9 @@ const updateMaterialSchema = z.object({
 // PATCH - Update material (mark as purchased)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; materialId: string } }
+  context: { params: Promise<{ id: string; materialId: string }> }
 ) {
+  const { id, materialId } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -85,7 +86,7 @@ export async function PATCH(
     // Verify project belongs to user
     const project = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -100,8 +101,8 @@ export async function PATCH(
     // Verify material belongs to project
     const material = await prisma.projectMaterial.findFirst({
       where: {
-        id: params.materialId,
-        projectId: params.id,
+        id: materialId,
+        projectId: id,
       },
     });
 
@@ -128,7 +129,7 @@ export async function PATCH(
     }
 
     const updatedMaterial = await prisma.projectMaterial.update({
-      where: { id: params.materialId },
+      where: { id: materialId },
       data: updateData,
     });
 
@@ -139,7 +140,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error: "Validation error",
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );

@@ -69,8 +69,9 @@ const createMaterialSchema = z.object({
 // POST - Create a material
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -91,7 +92,7 @@ export async function POST(
     // Verify project belongs to user
     const project = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -115,7 +116,7 @@ export async function POST(
 
     const material = await prisma.projectMaterial.create({
       data: {
-        projectId: params.id,
+        projectId: id,
         name: validatedData.name,
         description: validatedData.description,
         quantity: validatedData.quantity,
@@ -134,7 +135,7 @@ export async function POST(
       return NextResponse.json(
         {
           error: "Validation error",
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );
@@ -152,8 +153,9 @@ export async function POST(
 // GET - List all materials for a project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -174,7 +176,7 @@ export async function GET(
     // Verify project belongs to user
     const project = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -188,7 +190,7 @@ export async function GET(
 
     const materials = await prisma.projectMaterial.findMany({
       where: {
-        projectId: params.id,
+        projectId: id,
       },
       orderBy: {
         name: "asc",

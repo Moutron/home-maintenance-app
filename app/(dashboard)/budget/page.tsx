@@ -618,7 +618,7 @@ export default function BudgetPage() {
                           />
                         </div>
                       </div>
-                      {spending.taskSpending !== undefined && (
+                      {"taskSpending" in spending && spending.taskSpending !== undefined && (
                         <div className="grid gap-4 md:grid-cols-2 pt-4 border-t">
                           <div>
                             <p className="text-sm text-muted-foreground">

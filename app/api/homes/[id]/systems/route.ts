@@ -32,8 +32,9 @@ const addSystemsSchema = z.object({
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id: homeId } = await context.params;
   try {
     const { userId: clerkId } = await auth();
 
@@ -51,10 +52,6 @@ export async function POST(
 
     const email = clerkUser.emailAddresses[0].emailAddress;
     const user = await getOrCreateUser(clerkId, email);
-
-    // Handle params as Promise (Next.js 15) or object (Next.js 14)
-    const resolvedParams = await Promise.resolve(params);
-    const homeId = resolvedParams.id;
 
     // Verify home belongs to user
     const home = await prisma.home.findFirst({

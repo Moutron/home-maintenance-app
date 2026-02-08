@@ -58,8 +58,9 @@ async function getOrCreateUser(clerkId: string, email: string) {
 // POST - Upload photo
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -80,7 +81,7 @@ export async function POST(
     // Verify project belongs to user
     const project = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -115,7 +116,7 @@ export async function POST(
     // For now, we'll store as data URL (not recommended for production)
     const photo = await prisma.projectPhoto.create({
       data: {
-        projectId: params.id,
+        projectId: id,
         stepId: stepId || null,
         url: dataUrl,
         caption: caption || null,
@@ -140,8 +141,9 @@ export async function POST(
 // GET - List photos
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -162,7 +164,7 @@ export async function GET(
     // Verify project belongs to user
     const project = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -176,7 +178,7 @@ export async function GET(
 
     const photos = await prisma.projectPhoto.findMany({
       where: {
-        projectId: params.id,
+        projectId: id,
       },
       orderBy: {
         uploadedAt: "desc",

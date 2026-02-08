@@ -62,8 +62,9 @@ const updateToolSchema = z.object({
 // PATCH - Update tool (mark as purchased)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; toolId: string } }
+  context: { params: Promise<{ id: string; toolId: string }> }
 ) {
+  const { id, toolId } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -84,7 +85,7 @@ export async function PATCH(
     // Verify project belongs to user
     const project = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -99,8 +100,8 @@ export async function PATCH(
     // Verify tool belongs to project
     const tool = await prisma.projectTool.findFirst({
       where: {
-        id: params.toolId,
-        projectId: params.id,
+        id: toolId,
+        projectId: id,
       },
     });
 
@@ -120,7 +121,7 @@ export async function PATCH(
     }
 
     const updatedTool = await prisma.projectTool.update({
-      where: { id: params.toolId },
+      where: { id: toolId },
       data: updateData,
     });
 
@@ -131,7 +132,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error: "Validation error",
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );

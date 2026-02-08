@@ -64,8 +64,9 @@ const updateStepSchema = z.object({
 // PATCH - Update step status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; stepId: string } }
+  context: { params: Promise<{ id: string; stepId: string }> }
 ) {
+  const { id, stepId } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -86,7 +87,7 @@ export async function PATCH(
     // Verify project belongs to user
     const project = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -101,8 +102,8 @@ export async function PATCH(
     // Verify step belongs to project
     const step = await prisma.projectStep.findFirst({
       where: {
-        id: params.stepId,
-        projectId: params.id,
+        id: stepId,
+        projectId: id,
       },
     });
 
@@ -121,7 +122,7 @@ export async function PATCH(
       updateData.status = validatedData.status;
       if (validatedData.status === "completed") {
         updateData.completedAt = new Date();
-      } else if (validatedData.status !== "completed" && step.completedAt) {
+      } else if (step.completedAt) {
         updateData.completedAt = null;
       }
     }
@@ -133,21 +134,21 @@ export async function PATCH(
     }
 
     const updatedStep = await prisma.projectStep.update({
-      where: { id: params.stepId },
+      where: { id: stepId },
       data: updateData,
     });
 
     // Update project's actual hours if step hours changed
     if (validatedData.actualHours !== undefined) {
       const allSteps = await prisma.projectStep.findMany({
-        where: { projectId: params.id },
+        where: { projectId: id },
       });
       const totalActualHours = allSteps.reduce((sum, s) => {
-        return sum + (s.id === params.stepId ? validatedData.actualHours! : (s.actualHours || 0));
+        return sum + (s.id === stepId ? validatedData.actualHours! : (s.actualHours || 0));
       }, 0);
       
       await prisma.diyProject.update({
-        where: { id: params.id },
+        where: { id },
         data: { actualHours: totalActualHours },
       });
     }
@@ -159,7 +160,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error: "Validation error",
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );

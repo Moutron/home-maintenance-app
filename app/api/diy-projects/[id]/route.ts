@@ -78,8 +78,9 @@ const updateProjectSchema = z.object({
 // GET - Get single project
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -99,7 +100,7 @@ export async function GET(
 
     const project = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
       include: {
@@ -167,8 +168,9 @@ export async function GET(
 // PATCH - Update project
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -189,7 +191,7 @@ export async function PATCH(
     // Verify project belongs to user
     const existingProject = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -232,7 +234,7 @@ export async function PATCH(
     if (validatedData.lessonsLearned !== undefined) updateData.lessonsLearned = validatedData.lessonsLearned;
 
     const project = await prisma.diyProject.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         home: {
@@ -272,7 +274,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error: "Validation error",
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );
@@ -290,8 +292,9 @@ export async function PATCH(
 // DELETE - Delete project
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -312,7 +315,7 @@ export async function DELETE(
     // Verify project belongs to user
     const existingProject = await prisma.diyProject.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -325,7 +328,7 @@ export async function DELETE(
     }
 
     await prisma.diyProject.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });

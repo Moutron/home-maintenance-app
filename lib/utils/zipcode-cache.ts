@@ -55,8 +55,8 @@ export async function getCachedZipCodeData(
     console.log("ZIP code cache hit for:", normalizedZip, "Source:", cached.source);
 
     return {
-      weatherData: cached.weatherData as HistoricalWeatherData,
-      climateData: cached.climateData as ClimateData | undefined,
+      weatherData: cached.weatherData as unknown as HistoricalWeatherData,
+      climateData: cached.climateData as unknown as ClimateData | undefined,
     };
   } catch (error) {
     console.error("Error reading ZIP code cache:", error);

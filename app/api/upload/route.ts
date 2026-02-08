@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
             .webp({ quality: 85 })
             .toBuffer();
           
-          // Update file size for response
+          // Update file size for response (Buffer -> Uint8Array for BlobPart)
           processedFile = new File(
-            [processedBuffer],
+            [new Uint8Array(processedBuffer)],
             file.name.replace(/\.[^.]+$/, ".webp"),
             { type: "image/webp" }
           );

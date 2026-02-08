@@ -38,10 +38,6 @@ export default defineConfig({
     },
     include: ["tests/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", "dist", ".next", "**/*.d.ts"],
-    transformMode: {
-      web: [/\.[jt]sx?$/],
-      ssr: [/\.[jt]sx?$/],
-    },
     env: {},
   },
   resolve: {

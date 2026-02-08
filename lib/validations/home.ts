@@ -76,4 +76,5 @@ export const createHomeSchema = z.object({
   windZone: z.string().optional(),
   systems: z.array(homeSystemSchema),
 });
+export type CreateHomeInput = z.infer<typeof createHomeSchema>;
 export type HomeSystemInput = z.infer<typeof homeSystemSchema>;

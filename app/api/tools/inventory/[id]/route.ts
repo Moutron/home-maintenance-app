@@ -71,8 +71,9 @@ const updateToolSchema = z.object({
 // GET - Get single tool
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -92,7 +93,7 @@ export async function GET(
 
     const tool = await prisma.toolInventory.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -120,8 +121,9 @@ export async function GET(
 // PATCH - Update tool
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -141,7 +143,7 @@ export async function PATCH(
 
     const tool = await prisma.toolInventory.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -171,7 +173,7 @@ export async function PATCH(
     if (validatedData.notes !== undefined) updateData.notes = validatedData.notes;
 
     const updatedTool = await prisma.toolInventory.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
 
@@ -182,7 +184,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error: "Validation error",
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );
@@ -200,8 +202,9 @@ export async function PATCH(
 // DELETE - Delete tool
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -221,7 +224,7 @@ export async function DELETE(
 
     const tool = await prisma.toolInventory.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });
@@ -234,7 +237,7 @@ export async function DELETE(
     }
 
     await prisma.toolInventory.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });

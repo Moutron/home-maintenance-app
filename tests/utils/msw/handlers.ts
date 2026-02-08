@@ -18,10 +18,11 @@ export const handlers = [
 
   http.post(`${baseUrl}/api/homes`, async ({ request }) => {
     const body = await request.json();
+    const bodyObj = typeof body === "object" && body !== null ? body : {};
     return HttpResponse.json({
       home: {
         ...testData.home,
-        ...body,
+        ...bodyObj,
         id: `home_${Date.now()}`,
       },
     }, { status: 201 });
@@ -45,10 +46,11 @@ export const handlers = [
 
   http.post(`${baseUrl}/api/tasks`, async ({ request }) => {
     const body = await request.json();
+    const bodyObj = typeof body === "object" && body !== null ? body : {};
     return HttpResponse.json({
       task: {
         ...testData.task,
-        ...body,
+        ...bodyObj,
         id: `task_${Date.now()}`,
       },
     }, { status: 201 });
@@ -56,10 +58,11 @@ export const handlers = [
 
   http.patch(`${baseUrl}/api/tasks`, async ({ request }) => {
     const body = await request.json();
+    const bodyObj = typeof body === "object" && body !== null ? body : {};
     return HttpResponse.json({
       task: {
         ...testData.task,
-        ...body,
+        ...bodyObj,
       },
     });
   }),
@@ -86,10 +89,11 @@ export const handlers = [
 
   http.post(`${baseUrl}/api/maintenance/history`, async ({ request }) => {
     const body = await request.json();
+    const bodyObj = typeof body === "object" && body !== null ? body : {};
     return HttpResponse.json({
       record: {
         id: `maint_${Date.now()}`,
-        ...body,
+        ...bodyObj,
       },
     }, { status: 201 });
   }),
@@ -121,10 +125,11 @@ export const handlers = [
 
   http.post(`${baseUrl}/api/budget/plans`, async ({ request }) => {
     const body = await request.json();
+    const bodyObj = typeof body === "object" && body !== null ? body : {};
     return HttpResponse.json({
       plan: {
         ...testData.budgetPlan,
-        ...body,
+        ...bodyObj,
         id: `budget_${Date.now()}`,
       },
     }, { status: 201 });
@@ -139,10 +144,11 @@ export const handlers = [
 
   http.post(`${baseUrl}/api/diy-projects`, async ({ request }) => {
     const body = await request.json();
+    const bodyObj = typeof body === "object" && body !== null ? body : {};
     return HttpResponse.json({
       project: {
         ...testData.diyProject,
-        ...body,
+        ...bodyObj,
         id: `project_${Date.now()}`,
       },
     }, { status: 201 });

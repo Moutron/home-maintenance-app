@@ -105,7 +105,7 @@ function parseZillowHTML(html: string): ScrapedPropertyData | null {
   try {
     // Extract JSON-LD structured data if available
     const jsonLdMatch = html.match(
-      /<script type="application\/ld\+json">(.*?)<\/script>/s
+      /<script type="application\/ld\+json">([\s\S]*?)<\/script>/
     );
     if (jsonLdMatch) {
       try {

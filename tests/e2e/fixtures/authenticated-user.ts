@@ -2,17 +2,17 @@
  * Playwright Fixture for Authenticated User
  */
 
-import { test as base } from "@playwright/test";
+import { test as base, type Page } from "@playwright/test";
 import { LoginPage } from "../pages/LoginPage";
 
 type AuthenticatedUserFixtures = {
-  authenticatedPage: any; // Page with authenticated user
+  authenticatedPage: Page;
   loginPage: LoginPage;
 };
 
 export const test = base.extend<AuthenticatedUserFixtures>({
   // Authenticated page fixture
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }: { page: Page }, use) => {
     // Note: This is a placeholder - actual implementation depends on Clerk test mode
     // For now, we'll just provide the page and let individual tests handle auth
     
@@ -25,7 +25,7 @@ export const test = base.extend<AuthenticatedUserFixtures>({
   },
 
   // Login page fixture
-  loginPage: async ({ page }, use) => {
+  loginPage: async ({ page }: { page: Page }, use) => {
     const loginPage = new LoginPage(page);
     await use(loginPage);
   },

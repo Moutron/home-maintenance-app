@@ -380,7 +380,7 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                <Tooltip formatter={(value) => `$${(value ?? 0).toLocaleString()}`} />
                 <Legend />
                 <Line
                   type="monotone"
@@ -404,15 +404,16 @@ export default function DashboardPage() {
             {spending.byCategory.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <RechartsPieChart>
-                  <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                  <Tooltip formatter={(value) => `$${(value ?? 0).toLocaleString()}`} />
                   <Legend />
                   <Pie
                     data={spending.byCategory}
+                    nameKey="category"
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ category, percent }) =>
-                      `${category}: ${(percent * 100).toFixed(0)}%`
+                    label={({ name, percent }) =>
+                      `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
                     }
                     outerRadius={80}
                     fill="#8884d8"

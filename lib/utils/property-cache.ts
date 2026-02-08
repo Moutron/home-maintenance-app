@@ -58,7 +58,7 @@ export async function getCachedPropertyData(
     console.log("Cache hit for:", cacheKey, "Source:", cached.source);
     
     // Return cached data
-    return cached.propertyData as EnrichedPropertyData;
+    return cached.propertyData as unknown as EnrichedPropertyData;
   } catch (error) {
     console.error("Error reading from cache:", error);
     return null; // Fail gracefully - return null to allow API call

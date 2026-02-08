@@ -21,8 +21,9 @@ async function getOrCreateUser(clerkId: string, email: string) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
 
@@ -43,7 +44,7 @@ export async function GET(
 
     const budgetPlan = await prisma.budgetPlan.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
       include: {
@@ -175,8 +176,9 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
 
@@ -207,7 +209,7 @@ export async function PATCH(
 
     const budgetPlan = await prisma.budgetPlan.updateMany({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
       data: updateData,
@@ -221,7 +223,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.budgetPlan.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ budgetPlan: updated });
@@ -236,8 +238,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   try {
     const { userId: clerkId } = await auth();
 
@@ -258,7 +261,7 @@ export async function DELETE(
 
     const budgetPlan = await prisma.budgetPlan.deleteMany({
       where: {
-        id: params.id,
+        id,
         userId: user.id,
       },
     });

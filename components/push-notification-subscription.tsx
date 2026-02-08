@@ -7,6 +7,14 @@ import { CheckCircle2, AlertCircle, Bell } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import OneSignal from "react-onesignal";
 
+// OneSignal SDK types (IOneSignalOneSignal) don't expose all runtime methods; use typed helper for calls
+const OneSignalAPI = OneSignal as typeof OneSignal & {
+  isPushNotificationsEnabled?: () => Promise<boolean>;
+  registerForPushNotifications?: () => Promise<void>;
+  getUserId?: () => Promise<string | null | undefined>;
+  setSubscription?: (enable: boolean) => Promise<void>;
+};
+
 interface PushSubscriptionState {
   isSubscribed: boolean;
   isLoading: boolean;
@@ -60,13 +68,17 @@ export function PushNotificationSubscription() {
       await OneSignal.init({
         appId: appId,
         allowLocalhostAsSecureOrigin: true,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OneSignal notifyButton type requires many text keys we don't use
         notifyButton: {
           enable: false, // We'll use our own UI
-        },
+          prenotify: false,
+          showCredit: false,
+          text: "",
+        } as any,
       });
 
       // Check subscription status
-      const isSubscribed = await OneSignal.isPushNotificationsEnabled();
+      const isSubscribed = await OneSignalAPI.isPushNotificationsEnabled?.() ?? false;
       
       setState({
         isSubscribed,
@@ -89,8 +101,8 @@ export function PushNotificationSubscription() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      await OneSignal.registerForPushNotifications();
-      const isSubscribed = await OneSignal.isPushNotificationsEnabled();
+      await OneSignalAPI.registerForPushNotifications?.();
+      const isSubscribed = await OneSignalAPI.isPushNotificationsEnabled?.() ?? false;
       
       setState({
         isSubscribed,
@@ -100,7 +112,7 @@ export function PushNotificationSubscription() {
       });
 
       // Send player ID to server for association with user
-      const playerId = await OneSignal.getUserId();
+      const playerId = await OneSignalAPI.getUserId?.();
       if (playerId) {
         await fetch("/api/notifications/push/subscribe", {
           method: "POST",
@@ -125,7 +137,7 @@ export function PushNotificationSubscription() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      await OneSignal.setSubscription(false);
+      await OneSignalAPI.setSubscription?.(false);
       
       setState({
         isSubscribed: false,

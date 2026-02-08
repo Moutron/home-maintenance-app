@@ -33,14 +33,14 @@ if (typeof URL !== "undefined") {
 if (typeof globalThis !== "undefined" && typeof (globalThis as any).FileReader !== "function") {
   (globalThis as any).FileReader = class FileReader {
     result: string | ArrayBuffer | null = null;
-    onload: ((e: ProgressEvent<FileReader>) => void) | null = null;
-    onloadend: ((e: ProgressEvent<FileReader>) => void) | null = null;
-    onerror: ((e: ProgressEvent<FileReader>) => void) | null = null;
+    onload: ((e: ProgressEvent<EventTarget>) => void) | null = null;
+    onloadend: ((e: ProgressEvent<EventTarget>) => void) | null = null;
+    onerror: ((e: ProgressEvent<EventTarget>) => void) | null = null;
     readAsDataURL(blob: Blob) {
       setTimeout(() => {
         this.result = "data:image/jpeg;base64,fake";
-        if (this.onloadend) this.onloadend({ target: this } as ProgressEvent<FileReader>);
-        if (this.onload) this.onload({ target: this } as ProgressEvent<FileReader>);
+        if (this.onloadend) this.onloadend({ target: this } as unknown as ProgressEvent<EventTarget>);
+        if (this.onload) this.onload({ target: this } as unknown as ProgressEvent<EventTarget>);
       }, 0);
     }
   };

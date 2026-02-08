@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAI() {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY is not set");
+  return new OpenAI({ apiKey: key });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +54,7 @@ Respond in JSON format with the following structure:
   "additionalDetails": "Serial number visible: 1234567890, Installation date sticker shows 2019"
 }`;
 
+    const openai = getOpenAI();
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [

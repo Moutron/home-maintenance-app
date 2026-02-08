@@ -125,6 +125,11 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [completingProject, setCompletingProject] = useState(false);
+  const [completionNotes, setCompletionNotes] = useState("");
+  const [satisfactionRating, setSatisfactionRating] = useState<number | null>(null);
+  const [wouldDoAgain, setWouldDoAgain] = useState<boolean | null>(null);
+  const [lessonsLearned, setLessonsLearned] = useState("");
 
   useEffect(() => {
     if (params.id) {

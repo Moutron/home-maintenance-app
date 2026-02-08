@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
         costEstimate: validatedData.costEstimate,
         notes: validatedData.notes,
         snoozedUntil: validatedData.snoozedUntil ? new Date(validatedData.snoozedUntil) : null,
-        customRecurrence: validatedData.customRecurrence || null,
+        customRecurrence: validatedData.customRecurrence ?? undefined,
       },
       include: {
         home: {
@@ -264,7 +265,7 @@ export async function PATCH(request: NextRequest) {
           ? (validatedData.snoozedUntil ? new Date(validatedData.snoozedUntil) : null)
           : undefined,
         customRecurrence: validatedData.customRecurrence !== undefined
-          ? validatedData.customRecurrence
+          ? (validatedData.customRecurrence === null ? Prisma.JsonNull : validatedData.customRecurrence)
           : undefined,
       },
     });

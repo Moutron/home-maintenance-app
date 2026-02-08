@@ -521,7 +521,8 @@ export default function OnboardingPage() {
           const newSystems = autoSystems.filter(s => !existingSystemTypes.has(s.systemType));
           
           if (newSystems.length > 0) {
-            form.setValue("systems", [...currentSystems, ...newSystems]);
+            const merged = [...currentSystems, ...newSystems] as CreateHomeInput["systems"];
+            form.setValue("systems", merged);
             console.log(`Auto-populated ${newSystems.length} system(s):`, newSystems.map(s => s.systemType).join(", "));
           }
         }

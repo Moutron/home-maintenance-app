@@ -22,8 +22,9 @@ async function getOrCreateUser(clerkId: string, email: string) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id: homeId } = await context.params;
   try {
     const { userId: clerkId } = await auth();
 
@@ -41,10 +42,6 @@ export async function GET(
 
     const email = clerkUser.emailAddresses[0].emailAddress;
     const user = await getOrCreateUser(clerkId, email);
-
-    // Handle params as Promise (Next.js 15) or object (Next.js 14)
-    const resolvedParams = await Promise.resolve(params);
-    const homeId = resolvedParams.id;
 
     const home = await prisma.home.findFirst({
       where: {

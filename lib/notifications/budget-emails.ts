@@ -1,6 +1,10 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY is not set");
+  return new Resend(key);
+}
 
 interface BudgetAlertEmailData {
   planName: string;
@@ -127,6 +131,7 @@ export async function sendBudgetAlertEmail(
   `;
 
   try {
+    const resend = getResend();
     await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || "Home Maintenance App <noreply@example.com>",
       to,
