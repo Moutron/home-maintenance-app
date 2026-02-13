@@ -1,7 +1,8 @@
-import { BudgetPeriod, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { BudgetPeriod } from "@/lib/schema-enums";
 
 async function getOrCreateUser(clerkId: string, email: string) {
   let user = await prisma.user.findUnique({

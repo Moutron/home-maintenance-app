@@ -38,7 +38,7 @@ On the **Configure Project** page:
 
 1. **Framework Preset** – Should be **Next.js**. If not, select it.
 2. **Root Directory** – Leave as **.** (project root). Only change if your app lives in a subfolder.
-3. **Build Command** – Leave default (`next build`) unless you’ve changed it.
+3. **Build Command** – Leave as **npm run build** (default). The project’s `package.json` script runs `prisma generate && next build`, so the Prisma client is generated before the Next.js build. Do **not** override this with `next build` only, or the build can fail.
 4. **Output Directory** – Leave default (Next.js sets this).
 5. **Install Command** – Leave default (`npm install` or `yarn install`).
 
@@ -48,10 +48,31 @@ Don’t click **Deploy** yet; add environment variables first.
 
 ## Step 4: Add Environment Variables
 
-Still on the Configure Project page (or go to **Settings → Environment Variables** after the project is created):
+Still on the Configure Project page (or go to **Settings → Environment Variables** after the project is created).
 
-1. Find the **Environment Variables** section.
-2. For each variable below, click **Add** (or **Add Another**), enter the **Name**, paste the **Value**, and choose **Production** (and **Preview** if you want preview deploys to use the same values).
+### Add your database connection string (`DATABASE_URL`)
+
+1. Open your **Vercel** dashboard: [vercel.com/dashboard](https://vercel.com/dashboard).
+2. Click your **project** (e.g. **home-maintenance-app**).
+3. Go to **Settings** (top tab) → **Environment Variables** (left sidebar).
+4. Click **Add New** (or **Add**).
+5. **Key:** type exactly: `DATABASE_URL` (no spaces, same spelling).
+6. **Value:** paste your **full** connection string. Examples:
+   - **Neon:**  
+     `postgresql://USER:PASSWORD@ep-xxx-pooler.REGION.azure.neon.tech/DBNAME?sslmode=require`  
+     (Use the **pooled** connection string from Neon, not the direct one.)
+   - You can copy it from:
+     - Neon: Dashboard → your project → **Connection string** → **Pooled connection** → copy.
+     - Or from your local `.env` or `.env.local` (the line that starts with `DATABASE_URL=`; use only the part after the `=`).
+7. **Environments:** check **Production**. If you use preview/PR deploys, also check **Preview** so those builds have the DB too.
+8. Click **Save**.
+9. **Redeploy** so the build uses it: go to **Deployments** → **⋯** on the latest deployment → **Redeploy**. (New env vars apply to the *next* build; the current deployment was built without them.)
+
+After this, the next build will have `DATABASE_URL` and `prisma generate` (and the app at runtime) will use your Neon DB.
+
+---
+
+For the rest of the variables:
 
 Add these **required** variables:
 
@@ -165,21 +186,31 @@ If anything fails, check **Deployments** → latest deployment → **Building** 
 
 ## Why Vercel Build Can Fail (and How to Avoid It)
 
-Vercel runs **strict TypeScript** during `npm run build`. If any callback parameter is inferred as `any` (e.g. in `.map((h) => ...)` or `.reduce((sum, x) => ...)`), the build fails with "Parameter 'x' implicitly has an 'any' type."
+### 1. Missing `DATABASE_URL` (most common)
 
-**Catch it before pushing:**
+The build runs `prisma generate && next build`. **`prisma generate` requires `DATABASE_URL`** (your schema and config read it). If it’s not set in Vercel, the build fails with something like:
 
-1. **Run the same build locally:**  
-   `npm run build`  
-   If it passes locally, it should pass on Vercel.
+`PrismaConfigEnvError: Missing required environment variable: DATABASE_URL`
 
-2. **Fix implicit `any` in API routes:**  
-   Add explicit types to callback parameters, e.g.  
-   `homes.map((h) => h.id)` → `homes.map((h: { id: string }) => h.id)`  
-   `arr.reduce((sum, x) => sum + x.cost, 0)` → `arr.reduce((sum: number, x: { cost: number | null }) => sum + (x.cost || 0), 0)`.
+**Fix:** In Vercel → **Project → Settings → Environment Variables**, add `DATABASE_URL` with your Neon (or other Postgres) connection string for **Production** (and **Preview** if you use preview deploys). Then redeploy.
 
-3. **CI:**  
-   The repo’s GitHub Actions workflow runs `npm run build` on push/PR; if that job passes, Vercel’s build should too.
+### 2. TypeScript / “implicit any” errors
+
+Vercel runs **strict TypeScript** during `next build`. If a callback parameter is inferred as `any`, the build fails with "Parameter 'x' implicitly has an 'any' type."
+
+**Fix:** Run the same build locally: `npm run build`. Fix any reported file/line (add explicit types to callbacks, or use enums from `lib/schema-enums.ts`). See [docs/IMPLICIT_ANY_DEPLOY_CHECKLIST.md](IMPLICIT_ANY_DEPLOY_CHECKLIST.md).
+
+### 3. Prisma enum import errors
+
+If you see `Module '"@prisma/client"' has no exported member 'BudgetAlertStatus'` (or similar), the app should use the shared enums from `lib/schema-enums.ts` and the build script should be `prisma generate && next build`. See **Schema Enums** in the [Implicit Any Deploy Checklist](IMPLICIT_ANY_DEPLOY_CHECKLIST.md#6b-schema-enums-best-practice).
+
+---
+
+**Quick checklist so the build passes:**
+
+- [ ] **DATABASE_URL** set in Vercel (Production and Preview if needed).
+- [ ] Build command is **npm run build** (so `prisma generate` runs first).
+- [ ] `npm run build` passes locally (with `DATABASE_URL` in `.env` or env).
 
 ---
 

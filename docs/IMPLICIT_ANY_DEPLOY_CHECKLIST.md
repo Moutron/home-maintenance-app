@@ -104,6 +104,23 @@ These files were updated to remove or replace **explicit** `any` (e.g. `catch (e
 
 ---
 
+## 6b. Schema Enums (Best Practice)
+
+**Problem:** Importing enums from `@prisma/client` (e.g. `BudgetAlertStatus`, `TaskCategory`) can fail on Vercel if the generated client isn’t ready when TypeScript runs.
+
+**Best practice:**
+
+1. **Single source of truth** – Use `lib/schema-enums.ts` for all schema enum types (string unions). Keep it in sync with `prisma/schema.prisma`. Import from there in app and lib:
+   ```ts
+   import type { BudgetAlertStatus, TaskCategory } from "@/lib/schema-enums";
+   where.status = status as BudgetAlertStatus;
+   ```
+2. **Generate before build** – In `package.json`, `"build": "prisma generate && next build"` so the Prisma client is generated before the Next build (local and Vercel). Ensure `DATABASE_URL` is set (e.g. in `.env` or Vercel env) when running `npm run build`.
+
+This keeps enum values in one place, avoids depending on Prisma’s export order, and makes builds reliable.
+
+---
+
 ## 7. Related Docs
 
 - **Build & deploy:** `docs/VERCEL_SETUP.md` (includes “Why Vercel build can fail”).

@@ -1,4 +1,4 @@
-import { ProjectCategory, TaskCategory } from "@prisma/client";
+import type { ProjectCategory, TaskCategory } from "@/lib/schema-enums";
 import { prisma } from "@/lib/prisma";
 import { sendPushNotificationToUser } from "@/lib/notifications/push";
 import { sendBudgetAlertEmail } from "@/lib/notifications/budget-emails";

@@ -1,4 +1,4 @@
-import { TaskFrequency } from "@prisma/client";
+import type { TaskFrequency } from "@/lib/schema-enums";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
