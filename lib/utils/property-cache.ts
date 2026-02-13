@@ -5,6 +5,7 @@
  * Cache expires after 30 days (configurable).
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { EnrichedPropertyData } from "./property-enrichment";
 
@@ -90,12 +91,12 @@ export async function setCachedPropertyData(
         state: state.trim().toUpperCase(),
         zipCode: zipCode.trim(),
         cacheKey,
-        propertyData: propertyData as any, // Prisma Json type
+        propertyData: propertyData as unknown as Prisma.InputJsonValue,
         source,
         expiresAt,
       },
       update: {
-        propertyData: propertyData as any,
+        propertyData: propertyData as unknown as Prisma.InputJsonValue,
         source,
         expiresAt,
         updatedAt: new Date(),

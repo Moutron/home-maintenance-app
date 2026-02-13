@@ -18,7 +18,7 @@ export interface PushNotificationData {
   url?: string;
   icon?: string;
   badge?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 /**

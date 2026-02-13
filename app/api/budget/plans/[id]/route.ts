@@ -1,3 +1,4 @@
+import { Prisma, ProjectCategory, TaskCategory } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -84,7 +85,7 @@ export async function GET(
         task: {
           homeId: { in: homeIds },
           ...(budgetPlan.category
-            ? { category: budgetPlan.category as any }
+            ? { category: budgetPlan.category as TaskCategory }
             : {}),
         },
         completedDate: {
@@ -113,7 +114,7 @@ export async function GET(
         userId: user.id,
         ...(budgetPlan.homeId ? { homeId: budgetPlan.homeId } : {}),
         ...(budgetPlan.category
-          ? { category: budgetPlan.category as any }
+          ? { category: budgetPlan.category as ProjectCategory }
           : {}),
         OR: [
           {
@@ -200,7 +201,7 @@ export async function PATCH(
     const body = await request.json();
     const { name, amount, startDate, endDate, isActive } = body;
 
-    const updateData: any = {};
+    const updateData: Prisma.BudgetPlanUpdateInput = {};
     if (name !== undefined) updateData.name = name;
     if (amount !== undefined) updateData.amount = parseFloat(amount);
     if (startDate !== undefined) updateData.startDate = new Date(startDate);

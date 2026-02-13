@@ -1,8 +1,9 @@
+import { TaskFrequency } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import OpenAI from "openai";
-import { generateComplianceTasks } from "@/lib/utils/compliance-tasks";
+import { generateComplianceTasks, type ComplianceTask } from "@/lib/utils/compliance-tasks";
 
 // Lazy-load OpenAI client to avoid build-time errors
 function getOpenAI() {
@@ -55,12 +56,13 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
       console.log("[4] Request body parsed successfully:", body);
-    } catch (bodyError: any) {
+    } catch (bodyError: unknown) {
+      const message = bodyError instanceof Error ? bodyError.message : String(bodyError);
       console.error("[ERROR] Error reading request body:", bodyError);
       return NextResponse.json(
         { 
           error: "Could not read request body", 
-          details: bodyError?.message || String(bodyError),
+          details: message,
         },
         { status: 400 }
       );
@@ -235,9 +237,9 @@ export async function POST(request: NextRequest) {
       if (template.ageRules) {
         const ageRules = template.ageRules as Record<string, string>;
         if (homeAge < 10 && ageRules.newHome) {
-          frequency = ageRules.newHome as any;
+          frequency = ageRules.newHome as TaskFrequency;
         } else if (homeAge > 20 && ageRules.oldHome) {
-          frequency = ageRules.oldHome as any;
+          frequency = ageRules.oldHome as TaskFrequency;
         }
       }
 
@@ -246,7 +248,7 @@ export async function POST(request: NextRequest) {
         const climateRules = template.climateRules as Record<string, string>;
         if (home.climateZone.includes("9") || home.climateZone.includes("10")) {
           if (climateRules.highDust) {
-            frequency = climateRules.highDust as any;
+            frequency = climateRules.highDust as TaskFrequency;
           }
         }
       }
@@ -256,7 +258,7 @@ export async function POST(request: NextRequest) {
         if (home.stormFrequency === "high" || home.stormFrequency === "severe") {
           // More frequent inspections in storm-prone areas
           if (frequency === "ANNUAL") {
-            frequency = "BIANNUAL" as any;
+            frequency = "BIANNUAL" as TaskFrequency;
           }
         }
       }
@@ -279,18 +281,18 @@ export async function POST(request: NextRequest) {
           
           // Adjust frequency based on roof age
           if (roofAge > 15 && frequency === "ANNUAL") {
-            frequency = "BIANNUAL" as any; // More frequent inspections for older roofs
+            frequency = "BIANNUAL" as TaskFrequency; // More frequent inspections for older roofs
           }
 
           // Adjust based on roof material
           if (roofSystem.material) {
             const material = roofSystem.material.toLowerCase();
             if (material.includes("asphalt") && roofAge > 20) {
-              frequency = "QUARTERLY" as any; // Asphalt shingles need more frequent checks when old
+              frequency = "QUARTERLY" as TaskFrequency; // Asphalt shingles need more frequent checks when old
             } else if (material.includes("metal") || material.includes("tile")) {
               // Metal and tile roofs can go longer between inspections
               if (frequency === "BIANNUAL") {
-                frequency = "ANNUAL" as any;
+                frequency = "ANNUAL" as TaskFrequency;
               }
             }
           }
@@ -300,7 +302,7 @@ export async function POST(request: NextRequest) {
             if (!roofSystem.stormResistance || !roofSystem.stormResistance.includes("wind-rated")) {
               // More frequent inspections if not properly rated for storms
               if (frequency === "ANNUAL") {
-                frequency = "QUARTERLY" as any;
+                frequency = "QUARTERLY" as TaskFrequency;
               }
             }
           }
@@ -319,13 +321,13 @@ export async function POST(request: NextRequest) {
             if (plumbingSystem.installDate) {
               const plumbingAge = new Date().getFullYear() - new Date(plumbingSystem.installDate).getFullYear();
               if (plumbingAge > 30 && template.name.toLowerCase().includes("leak")) {
-                frequency = "MONTHLY" as any; // Older copper pipes need more frequent checks
+                frequency = "MONTHLY" as TaskFrequency; // Older copper pipes need more frequent checks
               }
             }
           } else if (material.includes("pvc") || material.includes("pex")) {
             // PVC/PEX generally need less frequent maintenance
             if (frequency === "QUARTERLY") {
-              frequency = "BIANNUAL" as any;
+              frequency = "BIANNUAL" as TaskFrequency;
             }
           }
         }
@@ -343,7 +345,7 @@ export async function POST(request: NextRequest) {
           if (electricalAge > 30) {
             // Older electrical systems need annual inspections
             if (frequency === "BIANNUAL") {
-              frequency = "ANNUAL" as any;
+              frequency = "ANNUAL" as TaskFrequency;
             }
           }
 
@@ -353,7 +355,7 @@ export async function POST(request: NextRequest) {
             if (capacity < 100 && homeAge > 20) {
               // Low capacity + old home = more frequent checks
               if (frequency === "ANNUAL") {
-                frequency = "BIANNUAL" as any;
+                frequency = "BIANNUAL" as TaskFrequency;
               }
             }
           }
@@ -361,7 +363,7 @@ export async function POST(request: NextRequest) {
           // Check condition
           if (electricalSystem.condition === "poor" || electricalSystem.condition === "fair") {
             if (frequency === "ANNUAL") {
-              frequency = "QUARTERLY" as any; // Poor condition needs more frequent checks
+              frequency = "QUARTERLY" as TaskFrequency; // Poor condition needs more frequent checks
             }
           }
         }
@@ -383,7 +385,7 @@ export async function POST(request: NextRequest) {
           if (nextDueDate < now) {
             nextDueDate = new Date(now.getFullYear() + 1, targetMonth - 1, 1);
           }
-          frequency = "ANNUAL" as any;
+          frequency = "ANNUAL" as TaskFrequency;
         }
       }
 
@@ -423,7 +425,7 @@ export async function POST(request: NextRequest) {
 
     // Generate compliance tasks (with error handling and timeout)
     console.log("[26] Starting compliance task generation...");
-    let complianceTasks = [];
+    let complianceTasks: ComplianceTask[] = [];
     // Temporarily skip compliance tasks to debug hanging issue
     const SKIP_COMPLIANCE = false; // Set to true to skip compliance tasks
     if (!SKIP_COMPLIANCE) {
@@ -458,7 +460,7 @@ export async function POST(request: NextRequest) {
           );
           
           console.log("[28] Calling generateComplianceTasks...");
-          complianceTasks = await Promise.race([compliancePromise, timeoutPromise]) as any[];
+          complianceTasks = await Promise.race([compliancePromise, timeoutPromise]) as ComplianceTask[];
           console.log(`[29] Compliance tasks generated. Count: ${complianceTasks.length}`);
           
           if (complianceTasks.length > 0) {
@@ -565,18 +567,19 @@ export async function POST(request: NextRequest) {
         })
       );
       console.log(`[39] Database transaction completed. Created ${createdTasks.length} tasks`);
-    } catch (dbError: any) {
+    } catch (dbError: unknown) {
+      const errMsg = dbError instanceof Error ? dbError.message : String(dbError);
       console.error("[ERROR] Database error creating tasks:", dbError);
       console.error("[ERROR] First task that failed:", allTasks[0]);
       
       // Check if it's a Prisma enum validation error
-      if (dbError?.message?.includes("match") || dbError?.message?.includes("pattern")) {
+      if (errMsg.includes("match") || errMsg.includes("pattern")) {
         return NextResponse.json(
           { 
             error: "Invalid enum value",
             message: "One or more tasks have invalid category or frequency values",
             details: {
-              error: dbError.message,
+              error: errMsg,
               sampleTask: allTasks[0],
             },
           },
@@ -613,10 +616,10 @@ export async function POST(request: NextRequest) {
     
     // Check for Zod validation errors
     if (error && typeof error === "object" && "issues" in error) {
-      const zodError = error as any;
+      const zodError = error as { issues: Array<{ path: (string | number)[]; message: string; received?: unknown; code?: string }> };
       const issues = zodError.issues || [];
-      const errorMessages = issues.map((issue: any) => ({
-        field: issue.path.join("."),
+      const errorMessages = issues.map((issue) => ({
+        field: issue.path.map(String).join("."),
         message: issue.message,
         received: issue.received,
         code: issue.code,
@@ -625,7 +628,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           error: "Validation error",
-          message: `Validation failed: ${errorMessages.map((e: any) => `${e.field}: ${e.message}`).join(", ")}`,
+          message: `Validation failed: ${errorMessages.map((e) => `${e.field}: ${e.message}`).join(", ")}`,
           details: errorMessages,
           hint: "Check that all fields match required formats (ZIP: 12345 or 12345-6789, State: 2 letters)"
         },
@@ -635,7 +638,7 @@ export async function POST(request: NextRequest) {
     
     // Check for Prisma errors
     if (error && typeof error === "object" && "code" in error) {
-      const prismaError = error as any;
+      const prismaError = error as { code: string; message?: string; meta?: { target?: unknown } };
       console.error("Prisma error code:", prismaError.code);
       console.error("Prisma error meta:", prismaError.meta);
       
@@ -646,10 +649,13 @@ export async function POST(request: NextRequest) {
         );
       }
       if (prismaError.meta?.target) {
+        const targetStr = Array.isArray(prismaError.meta.target)
+          ? (prismaError.meta.target as string[]).join(", ")
+          : String(prismaError.meta.target);
         return NextResponse.json(
           { 
             error: "Database error",
-            message: `Invalid data for field: ${prismaError.meta.target.join(", ")}`,
+            message: `Invalid data for field: ${targetStr}`,
             details: prismaError.message,
             code: prismaError.code
           },

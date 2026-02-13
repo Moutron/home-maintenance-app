@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
 
     // Create a map of task names to IDs for dependency resolution
     const taskNameToId = new Map<string, string>();
-    const createdTasks: any[] = [];
+    const createdTasks: Awaited<ReturnType<typeof prisma.maintenanceTask.create>>[] = [];
 
     // First pass: create all tasks
     for (const task of aiResponse) {

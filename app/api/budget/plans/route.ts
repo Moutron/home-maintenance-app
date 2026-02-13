@@ -1,3 +1,4 @@
+import { BudgetPeriod, Prisma } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -42,12 +43,12 @@ export async function GET(request: NextRequest) {
     const period = searchParams.get("period"); // MONTHLY, QUARTERLY, ANNUAL
     const isActive = searchParams.get("isActive");
 
-    const where: any = {
+    const where: Prisma.BudgetPlanWhereInput = {
       userId: user.id,
     };
 
     if (period) {
-      where.period = period;
+      where.period = period as BudgetPeriod;
     }
 
     if (isActive !== null) {

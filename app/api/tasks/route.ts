@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, TaskCategory } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build where clause
-    const where: any = {
+    const where: Prisma.MaintenanceTaskWhereInput = {
       homeId: homeId ? homeId : { in: homeIds },
       // Filter out snoozed tasks (only show if snoozedUntil is null or in the past)
       AND: [
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (category) {
-      where.category = category;
+      where.category = category as TaskCategory;
     }
 
     const tasks = await prisma.maintenanceTask.findMany({

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -38,8 +39,9 @@ async function getOrCreateUser(clerkId: string, email: string) {
       },
     });
     return user;
-  } catch (createError: any) {
-    if (createError?.code === "P2002") {
+  } catch (createError: unknown) {
+    const err = createError as { code?: string };
+    if (err?.code === "P2002") {
       user = await prisma.user.findFirst({
         where: { email },
       });
@@ -93,7 +95,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category");
     const search = searchParams.get("search");
 
-    const where: any = {
+    const where: Prisma.ToolInventoryWhereInput = {
       userId: user.id,
     };
 
@@ -110,7 +112,7 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const tools = await (prisma as any).toolInventory.findMany({
+    const tools = await prisma.toolInventory.findMany({
       where,
       orderBy: [
         { category: "asc" },
@@ -119,17 +121,18 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ tools });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { name?: string; code?: string; message?: string; stack?: string };
     console.error("Error fetching tool inventory:", error);
-    console.error("Error name:", error?.name);
-    console.error("Error code:", error?.code);
-    console.error("Error message:", error?.message);
-    console.error("Error stack:", error?.stack);
+    console.error("Error name:", err?.name);
+    console.error("Error code:", err?.code);
+    console.error("Error message:", err?.message);
+    console.error("Error stack:", err?.stack);
     return NextResponse.json(
       {
         error: "Failed to fetch tool inventory",
-        details: error?.message || String(error),
-        message: error?.message || "An error occurred while fetching tools",
+        details: err?.message || String(error),
+        message: err?.message || "An error occurred while fetching tools",
       },
       { status: 500 }
     );
@@ -138,8 +141,8 @@ export async function GET(request: NextRequest) {
 
 // POST - Add tool to inventory
 export async function POST(request: NextRequest) {
-  let body: any = null;
-  let cleanedBody: any = null;
+  let body: Record<string, unknown> | null = null;
+  let cleanedBody: Record<string, unknown> = {};
   
   try {
     console.log("[TOOL-INVENTORY] POST request received");
@@ -166,44 +169,45 @@ export async function POST(request: NextRequest) {
     console.log("[TOOL-INVENTORY] Request body received:", JSON.stringify(body, null, 2));
     
     // Clean up empty strings and handle special cases - be very permissive
+    const b = body ?? {};
     cleanedBody = {
-      name: (body.name || "").trim(),
+      name: String(b.name ?? "").trim(),
     };
     
     // Only include fields that have non-empty values
-    if (body.description && typeof body.description === "string" && body.description.trim()) {
-      cleanedBody.description = body.description.trim();
+    if (b.description && typeof b.description === "string" && b.description.trim()) {
+      cleanedBody.description = b.description.trim();
     }
-    if (body.category && typeof body.category === "string" && body.category.trim()) {
-      cleanedBody.category = body.category.trim();
+    if (b.category && typeof b.category === "string" && b.category.trim()) {
+      cleanedBody.category = b.category.trim();
     }
-    if (body.brand && typeof body.brand === "string" && body.brand.trim()) {
-      cleanedBody.brand = body.brand.trim();
+    if (b.brand && typeof b.brand === "string" && b.brand.trim()) {
+      cleanedBody.brand = b.brand.trim();
     }
-    if (body.model && typeof body.model === "string" && body.model.trim()) {
-      cleanedBody.model = body.model.trim();
+    if (b.model && typeof b.model === "string" && b.model.trim()) {
+      cleanedBody.model = b.model.trim();
     }
-    if (body.purchaseDate && typeof body.purchaseDate === "string" && body.purchaseDate.trim()) {
-      cleanedBody.purchaseDate = body.purchaseDate.trim();
+    if (b.purchaseDate && typeof b.purchaseDate === "string" && b.purchaseDate.trim()) {
+      cleanedBody.purchaseDate = b.purchaseDate.trim();
     }
-    if (body.location && typeof body.location === "string" && body.location.trim()) {
-      cleanedBody.location = body.location.trim();
+    if (b.location && typeof b.location === "string" && b.location.trim()) {
+      cleanedBody.location = b.location.trim();
     }
-    if (body.notes && typeof body.notes === "string" && body.notes.trim()) {
-      cleanedBody.notes = body.notes.trim();
+    if (b.notes && typeof b.notes === "string" && b.notes.trim()) {
+      cleanedBody.notes = b.notes.trim();
     }
     
     // Handle purchasePrice - convert string to number, but don't include if invalid
-    if (body.purchasePrice !== undefined && body.purchasePrice !== null && body.purchasePrice !== "") {
-      const price = typeof body.purchasePrice === "string" ? parseFloat(body.purchasePrice) : body.purchasePrice;
+    if (b.purchasePrice !== undefined && b.purchasePrice !== null && b.purchasePrice !== "") {
+      const price = typeof b.purchasePrice === "string" ? parseFloat(b.purchasePrice) : Number(b.purchasePrice);
       if (!isNaN(price) && price > 0) {
         cleanedBody.purchasePrice = price;
       }
     }
     
     // Handle condition - only include if it's a valid enum value
-    if (body.condition && typeof body.condition === "string" && body.condition.trim()) {
-      const cond = body.condition.trim();
+    if (b.condition && typeof b.condition === "string" && b.condition.trim()) {
+      const cond = b.condition.trim();
       if (["excellent", "good", "fair", "poor"].includes(cond)) {
         cleanedBody.condition = cond;
       }
@@ -215,11 +219,11 @@ export async function POST(request: NextRequest) {
     try {
       validatedData = createToolSchema.parse(cleanedBody);
       console.log("Validated data:", JSON.stringify(validatedData, null, 2));
-    } catch (validationError: any) {
+    } catch (validationError: unknown) {
       console.error("Validation error:", validationError);
       if (validationError instanceof z.ZodError) {
-        const errorMessages = validationError.issues.map((err: any) => ({
-          field: err.path.length > 0 ? err.path.join(".") : "unknown",
+        const errorMessages = validationError.issues.map((err: z.ZodIssue) => ({
+          field: err.path.length > 0 ? err.path.map(String).join(".") : "unknown",
           message: err.message,
           code: err.code,
         }));
@@ -227,7 +231,7 @@ export async function POST(request: NextRequest) {
           {
             error: "Validation error",
             details: errorMessages,
-            message: `Validation failed: ${errorMessages.map((e: any) => `${e.field}: ${e.message}`).join(", ")}`,
+            message: `Validation failed: ${errorMessages.map((e) => `${e.field}: ${e.message}`).join(", ")}`,
           },
           { status: 400 }
         );
@@ -247,20 +251,21 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
-    } catch (checkError: any) {
+    } catch (checkError: unknown) {
+      const checkErr = checkError as { message?: string };
       console.error("Error checking toolInventory:", checkError);
       return NextResponse.json(
         {
           error: "Server configuration error",
           details: "ToolInventory model not available. Please restart the server and run 'npx prisma generate'.",
-          message: checkError.message,
+          message: checkErr.message,
         },
         { status: 500 }
       );
     }
 
     // Build database data object
-    const dbData: any = {
+    const dbData: Prisma.ToolInventoryUncheckedCreateInput = {
       userId: user.id,
       name: validatedData.name,
     };
@@ -295,43 +300,45 @@ export async function POST(request: NextRequest) {
     let tool;
     try {
       // Use type assertion to avoid TypeScript errors if model doesn't exist
-      tool = await (prisma as any).toolInventory.create({
+      tool = await prisma.toolInventory.create({
         data: dbData,
       });
       console.log("Tool created successfully:", tool.id);
-    } catch (dbError: any) {
+    } catch (dbError: unknown) {
+      const dbErr = dbError as { code?: string; message?: string; meta?: unknown };
       console.error("Database error:", dbError);
-      console.error("Database error code:", dbError?.code);
-      console.error("Database error meta:", dbError?.meta);
-      console.error("Database error message:", dbError?.message);
+      console.error("Database error code:", dbErr?.code);
+      console.error("Database error meta:", dbErr?.meta);
+      console.error("Database error message:", dbErr?.message);
       
       // Return proper JSON error instead of throwing
       return NextResponse.json(
         {
           error: "Database error",
-          details: dbError?.message || String(dbError),
-          message: `Failed to create tool: ${dbError?.message || "Database error occurred"}`,
-          code: dbError?.code,
+          details: dbErr?.message || String(dbError),
+          message: `Failed to create tool: ${dbErr?.message || "Database error occurred"}`,
+          code: dbErr?.code,
         },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ tool }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { name?: string; code?: string; message?: string; stack?: string };
     console.error("Error creating tool:", error);
-    console.error("Error name:", error?.name);
-    console.error("Error code:", error?.code);
-    console.error("Error message:", error?.message);
-    console.error("Error stack:", error?.stack);
+    console.error("Error name:", err?.name);
+    console.error("Error code:", err?.code);
+    console.error("Error message:", err?.message);
+    console.error("Error stack:", err?.stack);
     console.error("Request body:", body ? JSON.stringify(body, null, 2) : "null");
     console.error("Cleaned body:", cleanedBody ? JSON.stringify(cleanedBody, null, 2) : "null");
     
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
       console.error("Zod validation errors:", JSON.stringify(error.issues, null, 2));
-      const errorMessages = error.issues.map((err: any) => ({
-        field: err.path.length > 0 ? err.path.join(".") : "unknown",
+      const errorMessages = error.issues.map((err: z.ZodIssue) => ({
+        field: err.path.length > 0 ? err.path.map(String).join(".") : "unknown",
         message: err.message,
         code: err.code,
         path: err.path,
@@ -340,21 +347,22 @@ export async function POST(request: NextRequest) {
         {
           error: "Validation error",
           details: errorMessages,
-          message: `Validation failed: ${errorMessages.map((e: any) => `${e.field}: ${e.message}`).join(", ")}`,
+          message: `Validation failed: ${errorMessages.map((e) => `${e.field}: ${e.message}`).join(", ")}`,
         },
         { status: 400 }
       );
     }
     
     // Handle Prisma errors
-    if (error?.code && error.code.startsWith("P")) {
-      console.error("Prisma error:", error.code, error.meta);
+    const errWithCode = error as { code?: string; message?: string; meta?: unknown; constructor?: { name?: string } };
+    if (errWithCode?.code && errWithCode.code.startsWith("P")) {
+      console.error("Prisma error:", errWithCode.code, errWithCode.meta);
       return NextResponse.json(
         {
           error: "Database error",
-          details: error.message || String(error),
-          message: `Database error: ${error.message || "Failed to save tool"}`,
-          code: error.code,
+          details: errWithCode.message || String(error),
+          message: `Database error: ${errWithCode.message || "Failed to save tool"}`,
+          code: errWithCode.code,
         },
         { status: 500 }
       );
@@ -364,9 +372,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to create tool",
-        details: error?.message || String(error),
-        message: error?.message || "An unexpected error occurred",
-        type: error?.constructor?.name || "UnknownError",
+        details: err?.message || String(error),
+        message: err?.message || "An unexpected error occurred",
+        type: errWithCode?.constructor?.name || "UnknownError",
       },
       { status: 500 }
     );

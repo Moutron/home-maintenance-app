@@ -8,6 +8,7 @@
  * serves all properties in that ZIP code.
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { HistoricalWeatherData } from "./historical-weather";
 import type { ClimateData } from "./climate-data";
@@ -87,14 +88,14 @@ export async function setCachedZipCodeData(
         zipCode: normalizedZip,
         city: city.trim(),
         state: state.trim().toUpperCase(),
-        weatherData: weatherData as any,
-        climateData: climateData as any,
+        weatherData: weatherData as unknown as Prisma.InputJsonValue,
+        climateData: climateData as unknown as Prisma.InputJsonValue,
         source,
         expiresAt,
       },
       update: {
-        weatherData: weatherData as any,
-        climateData: climateData as any,
+        weatherData: weatherData as unknown as Prisma.InputJsonValue,
+        climateData: climateData as unknown as Prisma.InputJsonValue,
         source,
         expiresAt,
         updatedAt: new Date(),

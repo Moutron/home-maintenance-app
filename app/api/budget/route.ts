@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       id: string;
       completedDate: Date;
       actualCost: number | null;
-      task: any;
+      task: { id: string; name: string; category: string; homeId: string };
     }>;
 
     // Get upcoming tasks with cost estimates

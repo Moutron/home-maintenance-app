@@ -1,3 +1,4 @@
+import { ProjectCategory, TaskCategory } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendPushNotificationToUser } from "@/lib/notifications/push";
 import { sendBudgetAlertEmail } from "@/lib/notifications/budget-emails";
@@ -53,7 +54,7 @@ export async function checkBudgetAlerts() {
         userId: plan.userId,
         task: {
           homeId: { in: homeIds },
-          ...(plan.category ? { category: plan.category as any } : {}),
+          ...(plan.category ? { category: plan.category as TaskCategory } : {}),
         },
         completedDate: {
           gte: startDate,
@@ -68,7 +69,7 @@ export async function checkBudgetAlerts() {
         userId: plan.userId,
         ...(plan.homeId ? { homeId: plan.homeId } : {}),
         ...(plan.category
-          ? { category: plan.category as any }
+          ? { category: plan.category as ProjectCategory }
           : {}),
         OR: [
           {

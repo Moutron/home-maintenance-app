@@ -34,8 +34,22 @@ export async function searchAddresses(
     }
 
     const data = await response.json();
-    return data.map((item: any) => ({
-      display_name: item.display_name,
+    type NominatimItem = {
+      display_name?: string;
+      address?: {
+        house_number?: string;
+        road?: string;
+        city?: string;
+        town?: string;
+        village?: string;
+        municipality?: string;
+        state?: string;
+        postcode?: string;
+        country?: string;
+      };
+    };
+    return (data as NominatimItem[]).map((item): GeocodeResult => ({
+      display_name: item.display_name ?? "",
       address: {
         house_number: item.address?.house_number,
         road: item.address?.road,

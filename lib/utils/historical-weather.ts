@@ -103,7 +103,8 @@ export async function fetchHistoricalWeather(
     let tornadoCount = 0;
     let hailCount = 0;
 
-    days.forEach((day: any) => {
+    type WeatherDay = { precip?: number; snow?: number; temp?: number; maxTemp?: number; minTemp?: number; windspeed?: number; windgust?: number; conditions?: string; [key: string]: unknown };
+    days.forEach((day: WeatherDay) => {
       // Precipitation
       if (day.precip) totalRainfall += day.precip;
       if (day.snow) totalSnowfall += day.snow;
@@ -130,7 +131,7 @@ export async function fetchHistoricalWeather(
         conditions.includes("storm") ||
         conditions.includes("thunder") ||
         conditions.includes("rain") ||
-        day.precip > 0.5
+        (day.precip ?? 0) > 0.5
       ) {
         stormDays++;
       }

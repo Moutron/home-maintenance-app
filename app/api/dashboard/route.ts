@@ -3,6 +3,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, subDays, addDays, startOfYear, endOfYear } from "date-fns";
 
+/** Dashboard warranty bucket item */
+interface WarrantyAlertItem {
+  id: string;
+  name: string;
+  type: string;
+  brand: string | null;
+  model: string | null;
+  expiryDate: Date | null;
+  daysUntilExpiry: number;
+  home: unknown;
+}
+
+/** Dashboard item needing attention (EOL) */
+interface ItemNeedingAttention {
+  id: string;
+  name: string;
+  type: string;
+  brand: string | null;
+  model: string | null;
+  age: number;
+  expectedLifespan: number;
+  lifespanPercentage: number;
+  home: unknown;
+}
+
+/** Dashboard recent activity entry */
+interface RecentActivityItem {
+  type: string;
+  title: string;
+  description: string;
+  date: Date;
+  home: unknown;
+  cost?: number | null;
+}
+
 // Helper function to get or create user from Clerk
 async function getOrCreateUser(clerkId: string, email: string) {
   let user = await prisma.user.findUnique({
@@ -323,9 +358,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Warranty alerts
-    const warrantiesExpiring30: any[] = [];
-    const warrantiesExpiring60: any[] = [];
-    const warrantiesExpiring90: any[] = [];
+    const warrantiesExpiring30: WarrantyAlertItem[] = [];
+    const warrantiesExpiring60: WarrantyAlertItem[] = [];
+    const warrantiesExpiring90: WarrantyAlertItem[] = [];
 
     [...allAppliances, ...allExteriorFeatures, ...allInteriorFeatures].forEach((item: { id: string; warrantyExpiry: Date | null; applianceType?: string; featureType?: string; brand?: string | null; model?: string | null; home: unknown }) => {
       if (item.warrantyExpiry) {
@@ -334,12 +369,12 @@ export async function GET(request: NextRequest) {
           (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         );
 
-        const warrantyItem = {
+        const warrantyItem: WarrantyAlertItem = {
           id: item.id,
-          name: "applianceType" in item ? item.applianceType : "featureType" in item ? item.featureType : "",
+          name: ("applianceType" in item ? item.applianceType : "featureType" in item ? item.featureType : "") ?? "",
           type: "applianceType" in item ? "appliance" : "featureType" in item ? "exterior" : "interior",
-          brand: "brand" in item ? item.brand : null,
-          model: "model" in item ? item.model : null,
+          brand: "brand" in item ? item.brand ?? null : null,
+          model: "model" in item ? item.model ?? null : null,
           expiryDate: item.warrantyExpiry,
           daysUntilExpiry,
           home: item.home,
@@ -356,7 +391,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Items needing attention (approaching end of life)
-    const itemsNeedingAttention: any[] = [];
+    const itemsNeedingAttention: ItemNeedingAttention[] = [];
     [...allAppliances, ...allExteriorFeatures, ...allInteriorFeatures, ...allSystems].forEach(
       (item) => {
         if (item.installDate && item.expectedLifespan) {
@@ -396,7 +431,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Recent activity (last 10 items)
-    const recentActivity: any[] = [];
+    const recentActivity: RecentActivityItem[] = [];
 
     // Add recent task completions
     const recentCompletedTasks = await prisma.completedTask.findMany({

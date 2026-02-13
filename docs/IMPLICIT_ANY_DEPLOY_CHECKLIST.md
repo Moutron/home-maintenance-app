@@ -93,7 +93,18 @@ Then add explicit parameter types wherever TypeScript reports implicit `any`.
 
 ---
 
-## 6. Related Docs
+## 6. Explicit `any` Removed (Type-Safety Pass)
+
+These files were updated to remove or replace **explicit** `any` (e.g. `catch (e: any)`, `where: any`, `as any`) so the codebase is fully typed. Build passes with no type errors.
+
+- **app/api**: `tasks/route.ts` (where → Prisma), `tasks/generate/route.ts` (TaskFrequency, ComplianceTask[], catch unknown), `tasks/generate-ai/route.ts` (createdTasks typed), `budget/route.ts`, `budget/plans/route.ts`, `budget/plans/[id]/route.ts`, `budget/alerts/route.ts` (Prisma where + enums), `dashboard/route.ts` (WarrantyAlertItem, ItemNeedingAttention, RecentActivityItem), `homes/[id]/systems/route.ts` (z.ZodIssue), **`tools/inventory/route.ts`** (Prisma where/create, catch unknown, body/dbData typed, no `prisma as any`).
+- **lib**: `budget/alerts.ts` (TaskCategory/ProjectCategory), `notifications/push.ts` (Record&lt;string, unknown&gt;), `utils/zipcode-cache.ts`, `utils/property-cache.ts` (Prisma.InputJsonValue), `utils/geocoding.ts` (NominatimItem, GeocodeResult), `utils/historical-weather.ts` (WeatherDay).
+
+**Remaining `any` (optional cleanup):** Some API routes still use `catch (error: any)` or `updateData: any` (e.g. diy-projects, homes, tools/check-owned). Dashboard and component code use `useState<any>` or `payload: any` in places. These do not cause build failures; you can replace them over time with proper types using the same patterns above.
+
+---
+
+## 7. Related Docs
 
 - **Build & deploy:** `docs/VERCEL_SETUP.md` (includes “Why Vercel build can fail”).
 - **Architecture:** `docs/ARCHITECTURE.md`.

@@ -1,3 +1,4 @@
+import { BudgetAlertStatus, Prisma } from "@prisma/client";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -42,12 +43,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status"); // PENDING, SENT, DISMISSED
 
-    const where: any = {
+    const where: Prisma.BudgetAlertWhereInput = {
       userId: user.id,
     };
 
     if (status) {
-      where.status = status;
+      where.status = status as BudgetAlertStatus;
     }
 
     const alerts = await prisma.budgetAlert.findMany({
