@@ -32,7 +32,7 @@ export async function sendWarrantyExpirationEmail(
   const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@example.com";
 
   // Group warranties by urgency
-  const critical = warranties.filter((w) => w.daysUntilExpiry <= 7);
+  const critical = warranties.filter((w: { daysUntilExpiry: number }) => w.daysUntilExpiry <= 7);
   const urgent = warranties.filter(
     (w) => w.daysUntilExpiry > 7 && w.daysUntilExpiry <= 30
   );

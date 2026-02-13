@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         yearBuilt: home.yearBuilt,
         homeType: home.homeType,
       },
-      templates: templates.map((t) => ({
+      templates: templates.map((t: (typeof templates)[number]) => ({
         id: t.id,
         name: t.name,
         category: t.category,

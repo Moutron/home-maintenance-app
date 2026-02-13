@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
 
       // Create appliances
       const appliances = await Promise.all(
-        validatedData.appliances.map((appliance) =>
+        validatedData.appliances.map((appliance: (typeof validatedData.appliances)[number]) =>
           tx.appliance.create({
             data: {
               homeId: validatedData.homeId,
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
 
       // Create exterior features
       const exteriorFeatures = await Promise.all(
-        validatedData.exteriorFeatures.map((feature) =>
+        validatedData.exteriorFeatures.map((feature: (typeof validatedData.exteriorFeatures)[number]) =>
           tx.exteriorFeature.create({
             data: {
               homeId: validatedData.homeId,
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
 
       // Create interior features
       const interiorFeatures = await Promise.all(
-        validatedData.interiorFeatures.map((feature) =>
+        validatedData.interiorFeatures.map((feature: (typeof validatedData.interiorFeatures)[number]) =>
           tx.interiorFeature.create({
             data: {
               homeId: validatedData.homeId,

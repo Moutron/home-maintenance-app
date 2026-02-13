@@ -327,7 +327,7 @@ export async function GET(request: NextRequest) {
     const warrantiesExpiring60: any[] = [];
     const warrantiesExpiring90: any[] = [];
 
-    [...allAppliances, ...allExteriorFeatures, ...allInteriorFeatures].forEach((item) => {
+    [...allAppliances, ...allExteriorFeatures, ...allInteriorFeatures].forEach((item: { id: string; warrantyExpiry: Date | null; applianceType?: string; featureType?: string; brand?: string | null; model?: string | null; home: unknown }) => {
       if (item.warrantyExpiry) {
         const expiryDate = new Date(item.warrantyExpiry);
         const daysUntilExpiry = Math.ceil(
@@ -492,7 +492,7 @@ export async function GET(request: NextRequest) {
         activeTasks: allTasks.filter((t: { completed: boolean }) => !t.completed).length,
       },
       alerts: {
-        overdueTasks: overdueTasks.slice(0, 10).map((task) => ({
+        overdueTasks: overdueTasks.slice(0, 10).map((task: (typeof overdueTasks)[number]) => ({
           id: task.id,
           name: task.name,
           category: task.category,
@@ -500,7 +500,7 @@ export async function GET(request: NextRequest) {
           priority: task.priority,
           home: task.home,
         })),
-        tasksDueToday: tasksDueToday.slice(0, 10).map((task) => ({
+        tasksDueToday: tasksDueToday.slice(0, 10).map((task: (typeof tasksDueToday)[number]) => ({
           id: task.id,
           name: task.name,
           category: task.category,
@@ -513,7 +513,7 @@ export async function GET(request: NextRequest) {
         itemsNeedingAttention,
       },
       tasks: {
-        upcoming: upcomingTasks.slice(0, 10).map((task) => ({
+        upcoming: upcomingTasks.slice(0, 10).map((task: (typeof upcomingTasks)[number]) => ({
           id: task.id,
           name: task.name,
           description: task.description,
@@ -522,7 +522,7 @@ export async function GET(request: NextRequest) {
           priority: task.priority,
           home: task.home,
         })),
-        overdue: overdueTasks.slice(0, 10).map((task) => ({
+        overdue: overdueTasks.slice(0, 10).map((task: (typeof overdueTasks)[number]) => ({
           id: task.id,
           name: task.name,
           description: task.description,
@@ -531,7 +531,7 @@ export async function GET(request: NextRequest) {
           priority: task.priority,
           home: task.home,
         })),
-        dueToday: tasksDueToday.slice(0, 10).map((task) => ({
+        dueToday: tasksDueToday.slice(0, 10).map((task: (typeof tasksDueToday)[number]) => ({
           id: task.id,
           name: task.name,
           description: task.description,

@@ -116,7 +116,8 @@ describe("Task Workflow Integration Tests", () => {
 
   describe("Task Filtering Workflow", () => {
     it("should filter tasks correctly", async () => {
-      const tasks = [
+      type TaskRow = { id: string; completed: boolean; snoozedUntil?: Date };
+      const tasks: TaskRow[] = [
         { ...testData.task, id: "task1", completed: false },
         { ...testData.task, id: "task2", completed: true },
         {

@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
 
       // Check roof age and material for roof-related tasks
       if (template.category === "EXTERIOR" && template.name.toLowerCase().includes("roof")) {
-        const roofSystem = home.systems.find((s) => s.systemType === "ROOF");
+        const roofSystem = home.systems.find((s: { systemType: string }) => s.systemType === "ROOF");
         if (roofSystem) {
           const roofAge = roofSystem.installDate
             ? new Date().getFullYear() - new Date(roofSystem.installDate).getFullYear()
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest) {
 
       // Check plumbing material for plumbing tasks
       if (template.category === "PLUMBING") {
-        const plumbingSystem = home.systems.find((s) => s.systemType === "PLUMBING");
+        const plumbingSystem = home.systems.find((s: { systemType: string }) => s.systemType === "PLUMBING");
         if (plumbingSystem && plumbingSystem.material) {
           const material = plumbingSystem.material.toLowerCase();
           
@@ -333,7 +333,7 @@ export async function POST(request: NextRequest) {
 
       // Check electrical system details
       if (template.category === "ELECTRICAL") {
-        const electricalSystem = home.systems.find((s) => s.systemType === "ELECTRICAL");
+        const electricalSystem = home.systems.find((s: { systemType: string }) => s.systemType === "ELECTRICAL");
         if (electricalSystem) {
           // Older electrical systems need more frequent inspections
           const electricalAge = electricalSystem.installDate
@@ -488,7 +488,7 @@ export async function POST(request: NextRequest) {
     const validFrequencies = ["WEEKLY", "MONTHLY", "QUARTERLY", "BIANNUAL", "ANNUAL", "SEASONAL", "AS_NEEDED"];
     
     const complianceTasksForDb = complianceTasks
-      .filter((task) => {
+      .filter((task: { category: string; frequency: string }) => {
         const categoryValid = validCategories.includes(task.category);
         const frequencyValid = validFrequencies.includes(task.frequency);
         if (!categoryValid || !frequencyValid) {
@@ -497,7 +497,7 @@ export async function POST(request: NextRequest) {
         }
         return true;
       })
-      .map((task) => ({
+      .map((task: (typeof complianceTasks)[number]) => ({
         homeId: home.id,
         name: task.name,
         description: task.description,
@@ -527,7 +527,7 @@ export async function POST(request: NextRequest) {
 
     console.log("[36] Validating task enum values...");
     // Final validation: ensure all tasks have valid enum values
-    const invalidTasks = allTasks.filter((task) => {
+    const invalidTasks = allTasks.filter((task: { category: string; frequency: string }) => {
       const categoryValid = validCategories.includes(task.category);
       const frequencyValid = validFrequencies.includes(task.frequency);
       return !categoryValid || !frequencyValid;
@@ -539,7 +539,7 @@ export async function POST(request: NextRequest) {
         { 
           error: "Invalid task data",
           message: `Found ${invalidTasks.length} task(s) with invalid category or frequency values`,
-          details: invalidTasks.map((task) => ({
+          details: invalidTasks.map((task: { name: string; category: string; frequency: string }) => ({
             name: task.name,
             category: task.category,
             frequency: task.frequency,
@@ -555,7 +555,7 @@ export async function POST(request: NextRequest) {
     let createdTasks;
     try {
       createdTasks = await prisma.$transaction(
-        allTasks.map((task, index) => {
+        allTasks.map((task: (typeof allTasks)[number], index: number) => {
           if (index === 0 || index === Math.floor(allTasks.length / 2) || index === allTasks.length - 1) {
             console.log(`[38.${index}] Creating task ${index + 1}/${allTasks.length}: ${task.name}`);
           }

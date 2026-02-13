@@ -94,12 +94,12 @@ export async function POST(request: NextRequest) {
     });
 
     const existingTaskNames = new Set(
-      existingTasks.map((t) => t.name.toLowerCase())
+      existingTasks.map((t: { name: string }) => t.name.toLowerCase())
     );
 
     // Filter out tasks that already exist
     const newComplianceTasks = complianceTasks.filter(
-      (task) => !existingTaskNames.has(task.name.toLowerCase())
+      (task: { name: string }) => !existingTaskNames.has(task.name.toLowerCase())
     );
 
     if (newComplianceTasks.length === 0) {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     // Create compliance tasks in database
     const createdTasks = await prisma.$transaction(
-      newComplianceTasks.map((task) =>
+      newComplianceTasks.map((task: (typeof newComplianceTasks)[number]) =>
         prisma.maintenanceTask.create({
           data: {
             homeId: home.id,

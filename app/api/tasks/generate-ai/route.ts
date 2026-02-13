@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
         averageSnowfall: home.averageSnowfall || undefined,
         windZone: home.windZone || undefined,
       },
-      systems: home.systems.map((s) => ({
+      systems: home.systems.map((s: (typeof home.systems)[number]) => ({
         systemType: s.systemType,
         brand: s.brand || undefined,
         model: s.model || undefined,
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
         lastInspection: s.lastInspection?.toISOString() || undefined,
         stormResistance: s.stormResistance || undefined,
       })),
-      appliances: home.appliances.map((a) => ({
+      appliances: home.appliances.map((a: (typeof home.appliances)[number]) => ({
         applianceType: a.applianceType,
         brand: a.brand || undefined,
         model: a.model || undefined,
@@ -184,13 +184,13 @@ export async function POST(request: NextRequest) {
         expectedLifespan: a.expectedLifespan || undefined,
         usageFrequency: a.usageFrequency || undefined,
       })),
-      exteriorFeatures: home.exteriorFeatures.map((e) => ({
+      exteriorFeatures: home.exteriorFeatures.map((e: (typeof home.exteriorFeatures)[number]) => ({
         featureType: e.featureType,
         material: e.material || undefined,
         installDate: e.installDate?.toISOString() || undefined,
         expectedLifespan: e.expectedLifespan || undefined,
       })),
-      interiorFeatures: home.interiorFeatures.map((i) => ({
+      interiorFeatures: home.interiorFeatures.map((i: (typeof home.interiorFeatures)[number]) => ({
         featureType: i.featureType,
         material: i.material || undefined,
         installDate: i.installDate?.toISOString() || undefined,

@@ -398,7 +398,7 @@ export async function POST(request: NextRequest) {
 
     // Find matching home (case-insensitive address, city, state, and zip code comparison)
     // Use fuzzy matching to handle minor differences
-    const existingHome = allUserHomes.find((h) => {
+    const existingHome = allUserHomes.find((h: { address: string; city: string; state: string; zipCode: string }) => {
       const hAddress = normalizeString(h.address);
       const hCity = normalizeString(h.city);
       const hState = h.state.toUpperCase().trim();
@@ -575,7 +575,7 @@ export async function POST(request: NextRequest) {
           console.log(`[UPSERT] P2002 error - searching ${conflictHomes.length} homes for conflict`);
           
           // Use same fuzzy matching logic
-          const conflictHome = conflictHomes.find((h) => {
+          const conflictHome = conflictHomes.find((h: { address: string; city: string; state: string; zipCode: string }) => {
             const hAddress = normalizeString(h.address);
             const hCity = normalizeString(h.city);
             const hState = h.state.toUpperCase().trim();

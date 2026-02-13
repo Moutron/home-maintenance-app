@@ -113,10 +113,10 @@ export async function sendBulkTaskReminders(
 
   if (tasks.length === 0) return;
 
-  const criticalTasks = tasks.filter((t) => t.priority === "critical");
-  const highPriorityTasks = tasks.filter((t) => t.priority === "high");
+  const criticalTasks = tasks.filter((t: { priority?: string }) => t.priority === "critical");
+  const highPriorityTasks = tasks.filter((t: { priority?: string }) => t.priority === "high");
   const otherTasks = tasks.filter(
-    (t) => t.priority !== "critical" && t.priority !== "high"
+    (t: { priority?: string }) => t.priority !== "critical" && t.priority !== "high"
   );
 
   try {
@@ -143,7 +143,7 @@ export async function sendBulkTaskReminders(
               ${criticalTasks.length > 0 ? `
                 <div style="margin: 20px 0;">
                   <h3 style="color: #dc2626;">🔴 Critical Priority (${criticalTasks.length})</h3>
-                  ${criticalTasks.map((task) => `
+                  ${criticalTasks.map((task: { taskName: string; dueDate: string; daysUntilDue: number }) => `
                     <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #dc2626;">
                       <strong>${task.taskName}</strong><br>
                       Due: ${new Date(task.dueDate).toLocaleDateString()} (${task.daysUntilDue} days)
@@ -155,7 +155,7 @@ export async function sendBulkTaskReminders(
               ${highPriorityTasks.length > 0 ? `
                 <div style="margin: 20px 0;">
                   <h3 style="color: #ea580c;">🟠 High Priority (${highPriorityTasks.length})</h3>
-                  ${highPriorityTasks.map((task) => `
+                  ${highPriorityTasks.map((task: { taskName: string; dueDate: string; daysUntilDue: number }) => `
                     <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #ea580c;">
                       <strong>${task.taskName}</strong><br>
                       Due: ${new Date(task.dueDate).toLocaleDateString()} (${task.daysUntilDue} days)
@@ -167,7 +167,7 @@ export async function sendBulkTaskReminders(
               ${otherTasks.length > 0 ? `
                 <div style="margin: 20px 0;">
                   <h3>Other Tasks (${otherTasks.length})</h3>
-                  ${otherTasks.map((task) => `
+                  ${otherTasks.map((task: { taskName: string; dueDate: string; daysUntilDue: number }) => `
                     <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #667eea;">
                       <strong>${task.taskName}</strong><br>
                       Due: ${new Date(task.dueDate).toLocaleDateString()} (${task.daysUntilDue} days)

@@ -365,7 +365,7 @@ export function matchRegulationsToTasks(
 
   for (const regulation of regulations) {
     // Match regulation to task based on keywords
-    const matchingTasks = tasks.filter((task) => {
+    const matchingTasks = tasks.filter((task: { name: string; category: string }) => {
       const taskLower = task.name.toLowerCase();
       const categoryLower = task.category.toLowerCase();
 
@@ -405,7 +405,7 @@ export function matchRegulationsToTasks(
     });
 
     if (matchingTasks.length > 0) {
-      matchingTasks.forEach((task) => {
+      matchingTasks.forEach((task: { name: string; category: string }) => {
         complianceRequirements.push({
           taskName: task.name,
           category: task.category,
@@ -454,7 +454,7 @@ export async function getComplianceRecommendations(
   );
 
   // Filter regulations that apply to this home
-  const applicableRegulations = regulations.filter((reg) => {
+  const applicableRegulations = regulations.filter((reg: LocalRegulation) => {
     if (!reg.appliesTo || reg.appliesTo.length === 0) return true;
 
     // Check if regulation applies to this home
@@ -473,10 +473,10 @@ export async function getComplianceRecommendations(
   const complianceTasks = matchRegulationsToTasks(applicableRegulations, []);
 
   const summary = {
-    required: applicableRegulations.filter((r) => r.required).length,
-    recommended: applicableRegulations.filter((r) => !r.required).length,
+    required: applicableRegulations.filter((r: LocalRegulation) => r.required).length,
+    recommended: applicableRegulations.filter((r: LocalRegulation) => !r.required).length,
     critical: applicableRegulations.filter(
-      (r) => r.required && r.type === "safety"
+      (r: LocalRegulation) => r.required && r.type === "safety"
     ).length,
   };
 

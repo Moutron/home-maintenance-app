@@ -46,7 +46,7 @@ export async function checkBudgetAlerts() {
       select: { id: true },
     });
 
-    const homeIds = homes.map((h) => h.id);
+    const homeIds = homes.map((h: { id: string }) => h.id);
 
     const completedTasks = await prisma.completedTask.findMany({
       where: {
@@ -247,13 +247,13 @@ export async function checkBudgetAlerts() {
     if (!project.budget) continue;
 
     const materialCost = project.materials.reduce(
-      (sum, m) => sum + (m.totalPrice || 0),
+      (sum: number, m: { totalPrice: number | null }) => sum + (m.totalPrice || 0),
       0
     );
 
     const toolCost = project.tools
-      .filter((t) => !t.owned)
-      .reduce((sum, t) => {
+      .filter((t: { owned: boolean }) => !t.owned)
+      .reduce((sum: number, t: { rentalCost: number | null; rentalDays: number | null; purchaseCost: number | null }) => {
         if (t.rentalCost && t.rentalDays) {
           return sum + t.rentalCost * t.rentalDays;
         }

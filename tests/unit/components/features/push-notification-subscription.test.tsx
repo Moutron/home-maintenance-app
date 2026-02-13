@@ -22,6 +22,12 @@ vi.mock("react-onesignal", () => ({
 // Mock API calls
 global.fetch = vi.fn();
 
+/** OneSignal mock shape used in tests (real types don't include all methods we mock) */
+type OneSignalMock = {
+  isPushNotificationsEnabled: ReturnType<typeof vi.fn>;
+  registerForPushNotifications: ReturnType<typeof vi.fn>;
+};
+
 describe("PushNotificationSubscription", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -82,7 +88,7 @@ describe("PushNotificationSubscription", () => {
 
   it("should toggle subscription", async () => {
     const user = userEvent.setup();
-    const OneSignal = (await import("react-onesignal")).default;
+    const OneSignal = (await import("react-onesignal")).default as unknown as OneSignalMock;
     vi.mocked(OneSignal.isPushNotificationsEnabled).mockResolvedValueOnce(false);
     
     render(<PushNotificationSubscription />);
@@ -100,7 +106,7 @@ describe("PushNotificationSubscription", () => {
   });
 
   it("should display subscribed state", async () => {
-    const OneSignal = (await import("react-onesignal")).default;
+    const OneSignal = (await import("react-onesignal")).default as unknown as OneSignalMock;
     vi.mocked(OneSignal.isPushNotificationsEnabled).mockResolvedValueOnce(true);
     
     render(<PushNotificationSubscription />);

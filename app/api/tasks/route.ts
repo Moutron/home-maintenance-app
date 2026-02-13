@@ -242,7 +242,7 @@ export async function PATCH(request: NextRequest) {
       select: { id: true },
     });
 
-    if (!userHomes.some((h) => h.id === task.homeId)) {
+    if (!userHomes.some((h: { id: string }) => h.id === task.homeId)) {
       return NextResponse.json(
         { error: "Access denied" },
         { status: 403 }

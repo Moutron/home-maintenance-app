@@ -51,7 +51,7 @@ describe("Tools Inventory by ID API", () => {
       mockPrisma.toolInventory.findFirst.mockResolvedValue(mockTool);
 
       const request = new NextRequest("http://localhost:3000/api/tools/inventory/tool_123");
-      const params = { id: "tool_123" };
+      const params = Promise.resolve({ id: "tool_123" });
       const response = await GET(request, { params });
       const data = await response.json();
 

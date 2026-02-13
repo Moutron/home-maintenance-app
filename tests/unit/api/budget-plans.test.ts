@@ -260,7 +260,7 @@ describe("Budget Plans API", () => {
         "http://localhost:3000/api/budget/plans/budget_test123"
       );
       const response = await GET_PLAN(request, {
-        params: { id: "budget_test123" },
+        params: Promise.resolve({ id: "budget_test123" }),
       });
       const data = await response.json();
 
@@ -277,7 +277,7 @@ describe("Budget Plans API", () => {
         "http://localhost:3000/api/budget/plans/nonexistent"
       );
       const response = await GET_PLAN(request, {
-        params: { id: "nonexistent" },
+        params: Promise.resolve({ id: "nonexistent" }),
       });
       const data = await response.json();
 
@@ -309,7 +309,7 @@ describe("Budget Plans API", () => {
       );
 
       const response = await PATCH(request, {
-        params: { id: "budget_test123" },
+        params: Promise.resolve({ id: "budget_test123" }),
       });
       const data = await response.json();
 
@@ -338,7 +338,7 @@ describe("Budget Plans API", () => {
       );
 
       const response = await PATCH(request, {
-        params: { id: "budget_test123" },
+        params: Promise.resolve({ id: "budget_test123" }),
       });
       const data = await response.json();
 
@@ -360,7 +360,7 @@ describe("Budget Plans API", () => {
       );
 
       const response = await PATCH(request, {
-        params: { id: "nonexistent" },
+        params: Promise.resolve({ id: "nonexistent" }),
       });
       const data = await response.json();
 
@@ -381,7 +381,7 @@ describe("Budget Plans API", () => {
       );
 
       const response = await DELETE(request, {
-        params: { id: "budget_test123" },
+        params: Promise.resolve({ id: "budget_test123" }),
       });
       const data = await response.json();
 
@@ -401,7 +401,7 @@ describe("Budget Plans API", () => {
       );
 
       const response = await DELETE(request, {
-        params: { id: "nonexistent" },
+        params: Promise.resolve({ id: "nonexistent" }),
       });
       const data = await response.json();
 

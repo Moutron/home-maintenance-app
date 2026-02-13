@@ -71,7 +71,7 @@ export async function POST(
 
     // Create systems
     const createdSystems = await Promise.all(
-      validatedData.systems.map((system) =>
+      validatedData.systems.map((system: (typeof validatedData.systems)[number]) =>
         prisma.homeSystem.create({
           data: {
             homeId,
@@ -107,8 +107,8 @@ export async function POST(
       return NextResponse.json(
         {
           error: "Validation error",
-          details: error.issues.map((issue) => ({
-            path: issue.path.join("."),
+          details: error.issues.map((issue: z.ZodIssue) => ({
+            path: issue.path.map(String).join("."),
             message: issue.message,
           })),
         },

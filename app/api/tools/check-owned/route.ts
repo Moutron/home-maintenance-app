@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     // Create a map of owned tool names (case-insensitive)
     const ownedToolNames = new Set(
-      userTools.map((tool) => tool.name.toLowerCase().trim())
+      userTools.map((tool: { name: string }) => tool.name.toLowerCase().trim())
     );
 
     // Check which tools are owned
@@ -102,9 +102,9 @@ export async function POST(request: NextRequest) {
       
       // Try to find exact match or partial match
       const matchingTool = userTools.find(
-        (tool) => tool.name.toLowerCase().trim() === normalizedName
+        (tool: { name: string }) => tool.name.toLowerCase().trim() === normalizedName
       ) || userTools.find(
-        (tool) => normalizedName.includes(tool.name.toLowerCase().trim()) ||
+        (tool: { name: string }) => normalizedName.includes(tool.name.toLowerCase().trim()) ||
                   tool.name.toLowerCase().trim().includes(normalizedName)
       );
 

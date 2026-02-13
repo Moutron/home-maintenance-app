@@ -278,7 +278,7 @@ export async function GET(request: NextRequest) {
       daysUntilExpiry: number;
     }> = [];
 
-    home.appliances.forEach((appliance) => {
+    home.appliances.forEach((appliance: { warrantyExpiry: Date | null; applianceType: string; brand?: string | null }) => {
       if (appliance.warrantyExpiry) {
         const expiry = new Date(appliance.warrantyExpiry);
         const daysUntilExpiry = differenceInDays(expiry, now);
@@ -293,7 +293,7 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    home.exteriorFeatures.forEach((feature) => {
+    home.exteriorFeatures.forEach((feature: { warrantyExpiry: Date | null; featureType: string; material?: string | null }) => {
       if (feature.warrantyExpiry) {
         const expiry = new Date(feature.warrantyExpiry);
         const daysUntilExpiry = differenceInDays(expiry, now);
@@ -308,7 +308,7 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    home.interiorFeatures.forEach((feature) => {
+    home.interiorFeatures.forEach((feature: { warrantyExpiry: Date | null; featureType: string; material?: string | null }) => {
       if (feature.warrantyExpiry) {
         const expiry = new Date(feature.warrantyExpiry);
         const daysUntilExpiry = differenceInDays(expiry, now);
