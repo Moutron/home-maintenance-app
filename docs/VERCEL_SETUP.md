@@ -204,6 +204,10 @@ Vercel runs **strict TypeScript** during `next build`. If a callback parameter i
 
 If you see `Module '"@prisma/client"' has no exported member 'BudgetAlertStatus'` (or similar), the app should use the shared enums from `lib/schema-enums.ts` and the build script should be `prisma generate && next build`. See **Schema Enums** in the [Implicit Any Deploy Checklist](IMPLICIT_ANY_DEPLOY_CHECKLIST.md#6b-schema-enums-best-practice).
 
+### 4. Next.js `output: 'standalone'` on Vercel
+
+The app uses `output: 'standalone'` only when **not** building on Vercel (when `VERCEL` is set, the config leaves `output` unset). That way Vercel uses its default serverless output. If you ever override the config and force standalone on Vercel, the deploy can behave incorrectly. See [docs/VERCEL_DEPLOYMENT_REVIEW.md](VERCEL_DEPLOYMENT_REVIEW.md).
+
 ---
 
 **Quick checklist so the build passes:**

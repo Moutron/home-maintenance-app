@@ -2,8 +2,11 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for Docker/serverless
-  output: process.env.NODE_ENV === "production" ? "standalone" : undefined,
+  // Standalone only for Docker/self-hosted. Vercel uses its own serverless output.
+  output:
+    process.env.NODE_ENV === "production" && !process.env.VERCEL
+      ? "standalone"
+      : undefined,
 
   // Security headers for production
   async headers() {

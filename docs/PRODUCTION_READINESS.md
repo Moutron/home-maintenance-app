@@ -29,7 +29,7 @@ This document outlines what’s in place and what’s recommended before going t
 
 | Item | Status | Notes |
 |------|--------|--------|
-| **Next.js production build** | ✅ Done | `output: 'standalone'` in production for Docker |
+| **Next.js production build** | ✅ Done | `output: 'standalone'` in production for Docker only; disabled on Vercel (`VERCEL=1`) so Vercel uses default serverless |
 | **Dockerfile** | ✅ Done | Multi-stage; non-root user; Prisma client + migrations dir copied |
 | **Docker Compose (prod)** | ✅ Done | `docker-compose.prod.yml`: app + Postgres, healthcheck on DB, env list |
 | **Vercel** | ✅ Ready | `vercel.json` with cron for warranties; set env vars in dashboard |
