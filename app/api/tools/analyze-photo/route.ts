@@ -1,16 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-// Lazy-load OpenAI client to avoid build-time errors
-function getOpenAI() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
-  return new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-}
+import { createCompletionWithImage } from "@/lib/ai/claude";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,8 +19,6 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await imageFile.arrayBuffer());
     const base64Image = buffer.toString("base64");
 
-    const openai = getOpenAI();
-
     const prompt = `Analyze this image of a tool. Identify the tool name, brand, model, category (e.g., "Power Tools", "Hand Tools", "Measuring Tools", "Safety Equipment", "Garden Tools", "Plumbing Tools", "Electrical Tools", "Painting Tools", "Other"), and estimate the condition (excellent, good, fair, poor) if visible.
 
 Return the information as a JSON object with the following structure:
@@ -45,26 +33,13 @@ Return the information as a JSON object with the following structure:
 
 If you cannot determine a field, set it to null. Do not include any other text in your response, just the JSON object.`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${imageFile.type};base64,${base64Image}`,
-              },
-            },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
+    const content = await createCompletionWithImage({
+      userText: prompt,
+      imageBase64: base64Image,
+      imageMediaType: imageFile.type || "image/jpeg",
+      maxTokens: 1024,
     });
-
-    const analysis = JSON.parse(response.choices[0].message.content || "{}");
+    const analysis = JSON.parse(content || "{}");
     return NextResponse.json({ success: true, analysis });
   } catch (error: any) {
     console.error("Error analyzing tool photo:", error);

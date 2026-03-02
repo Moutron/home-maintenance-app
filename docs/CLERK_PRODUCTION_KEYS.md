@@ -169,8 +169,32 @@ If sign-in fails, double-check:
 
 ---
 
+## Troubleshooting: “I get an error creating a production instance”
+
+Clerk production has a few hard requirements. If the dashboard shows an error when you try **Create production instance**, check the following.
+
+1. **Use production only when you need it**  
+   You can run your app on Vercel **without** a production Clerk instance. Use your **development** keys in Vercel:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` = `pk_test_...`
+   - `CLERK_SECRET_KEY` = `sk_test_...`  
+   Sign-in and auth will work; you’ll see Clerk’s dev branding and the 100-user dev limit. That’s fine for testing. Create a production instance later when you’re ready for a custom domain and live users.
+
+2. **Pro plan**  
+   Clerk may require a **Pro** (paid) plan to create or use a production instance. If the error mentions upgrading or a paid plan, go to [Clerk Pricing](https://clerk.com/pricing) and upgrade the application, then try **Create production instance** again.
+
+3. **Domain**  
+   Production instances require a **domain you own** (e.g. `yourapp.com` or `yourapp.vercel.app`). You add it in **Configure → Domains** after the production instance exists. If the error says you need a domain, try creating the production instance first (clone from development), then add your Vercel URL (e.g. `your-app.vercel.app`) on the **Domains** page.
+
+4. **Exact error message**  
+   If you see a specific message (e.g. “Upgrade to Pro”, “Add a domain”, “Invalid application”), follow that prompt. For other errors, try a different browser or try again in a few minutes; you can also contact [Clerk Support](https://clerk.com/support).
+
+**Summary:** To get the app live on Vercel quickly, use **development** Clerk keys. Switch to production keys only when you need your own domain, no dev banner, and no dev user cap.
+
+---
+
 ## References
 
 - [Clerk: Deploy your app to production](https://clerk.com/docs/deployments/overview)
+- [Clerk: Managing environments](https://clerk.com/docs/guides/development/managing-environments)
 - [Clerk Dashboard](https://dashboard.clerk.com)
 - [OAuth / Social connections](https://clerk.com/docs/guides/configure/auth-strategies/social-connections/overview)

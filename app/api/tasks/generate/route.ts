@@ -2,18 +2,7 @@ import type { TaskFrequency } from "@/lib/schema-enums";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import OpenAI from "openai";
 import { generateComplianceTasks, type ComplianceTask } from "@/lib/utils/compliance-tasks";
-
-// Lazy-load OpenAI client to avoid build-time errors
-function getOpenAI() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
-  return new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-}
 
 // Helper function to get or create user from Clerk
 async function getOrCreateUser(clerkId: string, email: string) {

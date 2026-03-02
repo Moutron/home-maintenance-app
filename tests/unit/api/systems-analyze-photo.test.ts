@@ -20,39 +20,27 @@ vi.mock("@/lib/prisma", async () => {
 // Mock Clerk
 vi.mock("@clerk/nextjs/server");
 
-// Mock OpenAI - use vi.hoisted to ensure mock is available before module import
-// Note: systems/analyze-photo creates the client at module level,
-// so we need to hoist the mock properly
-const { mockOpenAICreate } = vi.hoisted(() => {
-  const mockCreate = vi.fn().mockResolvedValue({
-    choices: [
-      {
-        message: {
-          content: JSON.stringify({
-            systemType: "HVAC",
-            brand: "Carrier",
-            model: "Infinity 19VS",
-            estimatedAge: 5,
-            condition: "good",
-            material: null,
-            capacity: "3 ton",
-            additionalDetails: "Serial number: 123456",
-          }),
-        },
-      },
-    ],
-  });
-  return { mockOpenAICreate: mockCreate };
+// Mock Claude (Anthropic) - vi.hoisted so mock is available when vi.mock runs
+const { mockCreateCompletionWithImage } = vi.hoisted(() => {
+  const fn = vi.fn().mockResolvedValue(
+    JSON.stringify({
+      systemType: "HVAC",
+      brand: "Carrier",
+      model: "Infinity 19VS",
+      estimatedAge: 5,
+      condition: "good",
+      material: null,
+      capacity: "3 ton",
+      additionalDetails: "Serial number: 123456",
+    })
+  );
+  return { mockCreateCompletionWithImage: fn };
 });
 
-vi.mock("openai", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: mockOpenAICreate,
-      },
-    },
-  })),
+vi.mock("@/lib/ai/claude", () => ({
+  createCompletion: vi.fn(),
+  createCompletionWithImage: mockCreateCompletionWithImage,
+  isAiConfigured: vi.fn().mockReturnValue(true),
 }));
 
 describe("Systems Analyze Photo API", () => {
@@ -66,25 +54,18 @@ describe("Systems Analyze Photo API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockClerkAuth();
-    // Reset OpenAI mock to success state
-    mockOpenAICreate.mockResolvedValue({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              systemType: "HVAC",
-              brand: "Carrier",
-              model: "Infinity 19VS",
-              estimatedAge: 5,
-              condition: "good",
-              material: null,
-              capacity: "3 ton",
-              additionalDetails: "Serial number: 123456",
-            }),
-          },
-        },
-      ],
-    });
+    mockCreateCompletionWithImage.mockResolvedValue(
+      JSON.stringify({
+        systemType: "HVAC",
+        brand: "Carrier",
+        model: "Infinity 19VS",
+        estimatedAge: 5,
+        condition: "good",
+        material: null,
+        capacity: "3 ton",
+        additionalDetails: "Serial number: 123456",
+      })
+    );
   });
 
   describe("POST /api/systems/analyze-photo", () => {
@@ -147,9 +128,8 @@ describe("Systems Analyze Photo API", () => {
       expect(data.error).toBe("Image is required");
     });
 
-    it("should handle OpenAI API errors", async () => {
-      // Make the mock throw an error for this test
-      mockOpenAICreate.mockRejectedValueOnce(new Error("OpenAI API error"));
+    it("should handle Claude API errors", async () => {
+      mockCreateCompletionWithImage.mockRejectedValueOnce(new Error("Claude API error"));
 
       const request = new NextRequest("http://localhost:3000/api/systems/analyze-photo", {
         method: "POST",
@@ -168,25 +148,18 @@ describe("Systems Analyze Photo API", () => {
       expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to analyze photo");
       
-      // Reset mock for other tests
-      mockOpenAICreate.mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                systemType: "HVAC",
-                brand: "Carrier",
-                model: "Infinity 19VS",
-                estimatedAge: 5,
-                condition: "good",
-                material: null,
-                capacity: "3 ton",
-                additionalDetails: "Serial number: 123456",
-              }),
-            },
-          },
-        ],
-      });
+      mockCreateCompletionWithImage.mockResolvedValue(
+        JSON.stringify({
+          systemType: "HVAC",
+          brand: "Carrier",
+          model: "Infinity 19VS",
+          estimatedAge: 5,
+          condition: "good",
+          material: null,
+          capacity: "3 ton",
+          additionalDetails: "Serial number: 123456",
+        })
+      );
     });
   });
 });

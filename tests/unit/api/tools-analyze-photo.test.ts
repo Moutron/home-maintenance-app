@@ -20,32 +20,25 @@ vi.mock("@/lib/prisma", async () => {
 // Mock Clerk
 vi.mock("@clerk/nextjs/server");
 
-// Mock OpenAI - use a controllable mock
-const mockOpenAICreate = vi.fn().mockResolvedValue({
-  choices: [
-    {
-      message: {
-        content: JSON.stringify({
-          name: "Cordless Drill",
-          brand: "DeWalt",
-          model: "DCD771",
-          category: "Power Tools",
-          condition: "good",
-          description: "20V Max cordless drill",
-        }),
-      },
-    },
-  ],
+// Mock Claude (Anthropic) - vi.hoisted so mock is available when vi.mock runs
+const { mockCreateCompletionWithImage } = vi.hoisted(() => {
+  const fn = vi.fn().mockResolvedValue(
+    JSON.stringify({
+      name: "Cordless Drill",
+      brand: "DeWalt",
+      model: "DCD771",
+      category: "Power Tools",
+      condition: "good",
+      description: "20V Max cordless drill",
+    })
+  );
+  return { mockCreateCompletionWithImage: fn };
 });
 
-vi.mock("openai", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: mockOpenAICreate,
-      },
-    },
-  })),
+vi.mock("@/lib/ai/claude", () => ({
+  createCompletion: vi.fn(),
+  createCompletionWithImage: mockCreateCompletionWithImage,
+  isAiConfigured: vi.fn().mockReturnValue(true),
 }));
 
 describe("Tools Analyze Photo API", () => {
@@ -59,23 +52,16 @@ describe("Tools Analyze Photo API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockClerkAuth();
-    // Reset OpenAI mock to success state
-    mockOpenAICreate.mockResolvedValue({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              name: "Cordless Drill",
-              brand: "DeWalt",
-              model: "DCD771",
-              category: "Power Tools",
-              condition: "good",
-              description: "20V Max cordless drill",
-            }),
-          },
-        },
-      ],
-    });
+    mockCreateCompletionWithImage.mockResolvedValue(
+      JSON.stringify({
+        name: "Cordless Drill",
+        brand: "DeWalt",
+        model: "DCD771",
+        category: "Power Tools",
+        condition: "good",
+        description: "20V Max cordless drill",
+      })
+    );
   });
 
   describe("POST /api/tools/analyze-photo", () => {
@@ -140,9 +126,8 @@ describe("Tools Analyze Photo API", () => {
       expect(data.error).toBe("No image file provided");
     });
 
-    it("should handle OpenAI API errors", async () => {
-      // Make the mock throw an error for this test
-      mockOpenAICreate.mockRejectedValueOnce(new Error("OpenAI API error"));
+    it("should handle Claude API errors", async () => {
+      mockCreateCompletionWithImage.mockRejectedValueOnce(new Error("Claude API error"));
 
       const mockFile = new File(["fake image data"], "tool.jpg", {
         type: "image/jpeg",
@@ -163,22 +148,16 @@ describe("Tools Analyze Photo API", () => {
       expect(data.error).toBe("Failed to analyze photo");
       
       // Reset mock for other tests
-      mockOpenAICreate.mockResolvedValue({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                name: "Cordless Drill",
-                brand: "DeWalt",
-                model: "DCD771",
-                category: "Power Tools",
-                condition: "good",
-                description: "20V Max cordless drill",
-              }),
-            },
-          },
-        ],
-      });
+      mockCreateCompletionWithImage.mockResolvedValue(
+        JSON.stringify({
+          name: "Cordless Drill",
+          brand: "DeWalt",
+          model: "DCD771",
+          category: "Power Tools",
+          condition: "good",
+          description: "20V Max cordless drill",
+        })
+      );
     });
   });
 });

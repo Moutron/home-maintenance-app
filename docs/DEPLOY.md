@@ -34,7 +34,7 @@ In the Vercel project **Settings → Environment Variables**, add at least:
 | `DATABASE_URL` | Yes | Production PostgreSQL connection string |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes | Clerk publishable key (production) |
 | `CLERK_SECRET_KEY` | Yes | Clerk secret key (production) |
-| `OPENAI_API_KEY` | Yes | For AI task generation and photo analysis |
+| `ANTHROPIC_API_KEY` | Yes | For AI task generation, DIY plans, and photo analysis (Claude) |
 | `NEXT_PUBLIC_APP_URL` | Yes | Production URL, e.g. `https://your-app.vercel.app` |
 | `CRON_SECRET` | Yes if using crons | Secret for cron endpoints; Vercel Crons send it when configured |
 | `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | Optional | Error tracking |
@@ -96,7 +96,7 @@ Ensure Postgres is running (e.g. via `docker-compose.prod.yml` or your own DB). 
 
 - `DATABASE_URL`
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
-- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
 - `NEXT_PUBLIC_APP_URL` (e.g. `https://your-domain.com`)
 - `CRON_SECRET` if you call cron endpoints
 
@@ -128,7 +128,7 @@ docker run -d \
   -e DATABASE_URL="postgresql://..." \
   -e NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="..." \
   -e CLERK_SECRET_KEY="..." \
-  -e OPENAI_API_KEY="..." \
+  -e ANTHROPIC_API_KEY="..." \
   -e NEXT_PUBLIC_APP_URL="https://..." \
   --name home-maintenance-app \
   home-maintenance-app:latest
@@ -206,7 +206,7 @@ Use this list with [.env.example](../.env.example) to ensure production env is c
 - [ ] `DATABASE_URL` – Production PostgreSQL
 - [ ] `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` – Clerk production
 - [ ] `CLERK_SECRET_KEY` – Clerk production
-- [ ] `OPENAI_API_KEY`
+- [ ] `ANTHROPIC_API_KEY`
 - [ ] `NEXT_PUBLIC_APP_URL` – Full production URL
 
 **Required if using crons**

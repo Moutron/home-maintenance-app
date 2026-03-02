@@ -1,6 +1,6 @@
 /**
  * AI Prompt Templates for Task Generation
- * These prompts are designed to work with OpenAI GPT-4 to generate
+ * These prompts are designed to work with Claude (Anthropic) to generate
  * personalized maintenance tasks based on comprehensive home inventory data.
  */
 

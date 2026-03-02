@@ -35,8 +35,8 @@ This document summarizes what your **technology stack** requires for Vercel and 
 - **App URL** (recommended):  
   - `NEXT_PUBLIC_APP_URL` — set to your Vercel URL (e.g. `https://your-app.vercel.app`) after first deploy.
 
-- **OpenAI** (only if you use AI features):  
-  - `OPENAI_API_KEY` — routes that need it check and return 501 when unset.
+- **Anthropic (Claude)** (only if you use AI features):  
+  - `ANTHROPIC_API_KEY` — required for AI task generation, DIY plan generation, and photo analysis; routes throw if unset.
 
 Optional: `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` (for source maps/releases), `CRON_SECRET` (for cron routes).
 

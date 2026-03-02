@@ -120,7 +120,7 @@ This document outlines what’s in place and what’s recommended before going t
 |------|--------|--------|
 | **.env.example** | ✅ Done | Documents required and optional vars |
 | **Required env at startup** | ✅ Done | `DATABASE_URL` validated in `lib/prisma.ts` |
-| **Optional env** | ✅ Handled | Routes check for RESEND_API_KEY, OPENAI_API_KEY, etc. before using |
+| **Optional env** | ✅ Handled | Routes check for RESEND_API_KEY, ANTHROPIC_API_KEY, etc. before using |
 | **Production env** | ⚠️ Manual | Set all production values in Vercel (or host) env; use production Clerk, Stripe, and API keys |
 | **Secrets rotation** | ❌ Manual | Document how to rotate DATABASE_URL, Clerk, OpenAI, CRON_SECRET, etc. |
 

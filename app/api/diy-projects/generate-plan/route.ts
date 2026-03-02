@@ -1,16 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-// Lazy-load OpenAI client to avoid build-time errors
-function getOpenAI() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
-  return new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-}
+import { createCompletion } from "@/lib/ai/claude";
 
 const projectPlanSchema = {
   type: "object",
@@ -203,9 +193,6 @@ Project Description: ${projectDescription}`;
 
 Be thorough, accurate, and safety-conscious. Provide realistic estimates based on current market prices.`;
 
-    // Call OpenAI
-    const openai = getOpenAI();
-    
     // Enhanced prompt with JSON format instructions
     const enhancedPrompt = `${prompt}
 
@@ -229,24 +216,13 @@ Please respond with a valid JSON object matching this exact structure:
 
 Return ONLY valid JSON, no other text.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert DIY home improvement advisor. Always provide comprehensive, accurate, and safety-conscious project plans. Be realistic with time and cost estimates. Always respond with valid JSON only.",
-        },
-        {
-          role: "user",
-          content: enhancedPrompt,
-        },
-      ],
-      response_format: { type: "json_object" },
+    const content = await createCompletion({
+      system:
+        "You are an expert DIY home improvement advisor. Always provide comprehensive, accurate, and safety-conscious project plans. Be realistic with time and cost estimates. Always respond with valid JSON only.",
+      userMessage: enhancedPrompt,
       temperature: 0.7,
+      maxTokens: 4096,
     });
-
-    const content = completion.choices[0]?.message?.content;
     if (!content) {
       throw new Error("No response from AI");
     }
@@ -273,12 +249,12 @@ Return ONLY valid JSON, no other text.`;
   } catch (error: any) {
     console.error("Error generating project plan:", error);
     
-    // Handle OpenAI API errors
-    if (error.message?.includes("OPENAI_API_KEY")) {
+    // Handle AI API errors
+    if (error instanceof Error && error.message?.includes("ANTHROPIC_API_KEY")) {
       return NextResponse.json(
         {
           error: "AI service not configured",
-          message: "OpenAI API key is not set up. Please configure OPENAI_API_KEY in your environment variables.",
+          message: "Anthropic API key is not set up. Please configure ANTHROPIC_API_KEY in your environment variables.",
         },
         { status: 500 }
       );

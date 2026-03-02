@@ -81,7 +81,7 @@ Add these **required** variables:
 | `DATABASE_URL` | Your Neon pooled connection string | Neon dashboard → Connection string (pooled). Same as in your `.env.local`. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_test_...` or `pk_live_...` | Clerk Dashboard → API Keys → Publishable key. |
 | `CLERK_SECRET_KEY` | `sk_test_...` or `sk_live_...` | Clerk Dashboard → API Keys → Secret key. |
-| `OPENAI_API_KEY` | `sk-...` | [platform.openai.com](https://platform.openai.com) → API keys. |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | [Anthropic Console](https://console.anthropic.com/) → API keys (Claude). |
 | `NEXT_PUBLIC_APP_URL` | `https://your-app.vercel.app` | **Use your Vercel URL.** After the first deploy, Vercel shows it (e.g. `https://home-maintenance-app-xxx.vercel.app`). You can add this before deploy with a placeholder, then edit it after the first deploy to the real URL. |
 
 **Optional but recommended:**
@@ -174,7 +174,7 @@ If anything fails, check **Deployments** → latest deployment → **Building** 
 - [ ] Code pushed to GitHub (or GitLab/Bitbucket).
 - [ ] Signed in to Vercel and imported the project.
 - [ ] Framework set to Next.js, root directory `.`.
-- [ ] `DATABASE_URL`, Clerk keys, `OPENAI_API_KEY`, `NEXT_PUBLIC_APP_URL` set in Production env.
+- [ ] `DATABASE_URL`, Clerk keys, `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_APP_URL` set in Production env.
 - [ ] Optional: `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `CRON_SECRET` set.
 - [ ] First deploy completed and **Visit** link works.
 - [ ] `NEXT_PUBLIC_APP_URL` updated to the real Vercel URL and redeployed.

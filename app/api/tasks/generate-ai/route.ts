@@ -1,20 +1,10 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import OpenAI from "openai";
+import { createCompletion } from "@/lib/ai/claude";
 import { buildTaskGenerationPrompt } from "@/lib/ai/prompts";
 import type { HomeInventoryData } from "@/lib/ai/prompts";
 import { generateComplianceTasks } from "@/lib/utils/compliance-tasks";
-
-// Lazy-load OpenAI client to avoid build-time errors
-function getOpenAI() {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
-  return new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-}
 
 // Helper function to get or create user from Clerk
 async function getOrCreateUser(clerkId: string, email: string) {
@@ -202,37 +192,24 @@ export async function POST(request: NextRequest) {
     // Build AI prompt
     const prompt = buildTaskGenerationPrompt(inventoryData);
 
-    // Call OpenAI
+    // Call Claude
     let aiResponse;
     try {
-      const openai = getOpenAI();
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert home maintenance advisor. Always respond with valid JSON arrays. Be thorough and comprehensive in your recommendations.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+      const content = await createCompletion({
+        system:
+          "You are an expert home maintenance advisor. Always respond with valid JSON arrays. Be thorough and comprehensive in your recommendations.",
+        userMessage: prompt,
         temperature: 0.7,
-        response_format: { type: "json_object" },
+        maxTokens: 4096,
       });
-
-      const content = completion.choices[0]?.message?.content;
       if (!content) {
         throw new Error("No response from AI");
       }
-
       const parsed = JSON.parse(content);
       // Handle both {tasks: [...]} and [...] formats
       aiResponse = parsed.tasks || parsed;
     } catch (error) {
-      console.error("OpenAI API error:", error);
+      console.error("Claude API error:", error);
       // Fallback to rule-based generation if AI fails
       return NextResponse.json(
         {

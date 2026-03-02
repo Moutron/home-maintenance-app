@@ -54,7 +54,7 @@ process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PU
 process.env.CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY || "sk_test_mock";
 process.env.RENTCAST_API_KEY = process.env.RENTCAST_API_KEY || "test_key";
 process.env.CENSUS_API_KEY = process.env.CENSUS_API_KEY || "test_key";
-process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || "sk-test-mock-key";
+process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "sk-ant-test-mock-key";
 process.env.NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 // Setup MSW server for API mocking

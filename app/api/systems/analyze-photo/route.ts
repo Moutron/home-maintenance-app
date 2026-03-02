@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import OpenAI from "openai";
-
-function getOpenAI() {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error("OPENAI_API_KEY is not set");
-  return new OpenAI({ apiKey: key });
-}
+import { createCompletionWithImage } from "@/lib/ai/claude";
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,35 +48,15 @@ Respond in JSON format with the following structure:
   "additionalDetails": "Serial number visible: 1234567890, Installation date sticker shows 2019"
 }`;
 
-    const openai = getOpenAI();
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: prompt,
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${imageBase64}`,
-              },
-            },
-          ],
-        },
-      ],
-      max_tokens: 500,
-      response_format: { type: "json_object" },
+    const analysisText = await createCompletionWithImage({
+      userText: prompt,
+      imageBase64: imageBase64,
+      imageMediaType: "image/jpeg",
+      maxTokens: 500,
     });
-
-    const analysisText = response.choices[0]?.message?.content;
     if (!analysisText) {
       throw new Error("No response from AI");
     }
-
     const analysis = JSON.parse(analysisText);
 
     // Calculate install date from estimated age

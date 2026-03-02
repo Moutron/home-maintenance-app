@@ -25,28 +25,22 @@ vi.mock("@/lib/prisma", async () => {
 // Mock Clerk
 vi.mock("@clerk/nextjs/server");
 
-// Mock OpenAI
-vi.mock("openai", () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: vi.fn().mockResolvedValue({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  name: "AI Generated Project",
-                  description: "Project description",
-                  category: "HVAC",
-                  difficulty: "EASY",
-                }),
-              },
-            },
-          ],
-        }),
-      },
-    },
-  })),
+// Mock Claude (Anthropic)
+vi.mock("@/lib/ai/claude", () => ({
+  createCompletion: vi.fn().mockResolvedValue(
+    JSON.stringify({
+      name: "AI Generated Project",
+      description: "Project description",
+      category: "HVAC",
+      difficulty: "EASY",
+      steps: [],
+      materials: [],
+      tools: [],
+      commonMistakes: [],
+    })
+  ),
+  createCompletionWithImage: vi.fn(),
+  isAiConfigured: vi.fn().mockReturnValue(true),
 }));
 
 describe("DIY Projects API", () => {
