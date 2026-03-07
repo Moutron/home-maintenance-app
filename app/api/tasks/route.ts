@@ -93,6 +93,9 @@ export async function GET(request: NextRequest) {
             zipCode: true,
             yearBuilt: true,
             homeType: true,
+            systems: {
+              select: { id: true, systemType: true, brand: true, model: true },
+            },
           },
         },
         template: {

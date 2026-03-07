@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Circle, Calendar, Home } from "lucide-react";
+import { CheckCircle2, Circle, Calendar, Home, Wrench, BookOpen } from "lucide-react";
 import { ComplianceBadge } from "@/components/compliance-badge";
 import {
   Dialog,
@@ -28,6 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import Link from "next/link";
 
 type Task = {
   id: string;
@@ -47,6 +48,7 @@ type Task = {
     zipCode: string;
     yearBuilt: number;
     homeType: string;
+    systems?: { id: string; systemType: string; brand: string | null; model: string | null }[];
   };
   template: {
     id: string;
@@ -64,6 +66,11 @@ export default function TasksPage() {
   const [filterHomeId, setFilterHomeId] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterCompleted, setFilterCompleted] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"dueDate" | "category" | "name">("dueDate");
+  const [learnMoreOpen, setLearnMoreOpen] = useState(false);
+  const [learnMoreTask, setLearnMoreTask] = useState<Task | null>(null);
+  const [howToCache, setHowToCache] = useState<Record<string, string>>({});
+  const [howToLoading, setHowToLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTasks();
@@ -81,6 +88,39 @@ export default function TasksPage() {
       console.error("Error fetching homes:", error);
     }
   };
+
+  const fetchHowTo = useCallback(async (task: Task) => {
+    setHowToLoading(task.id);
+    try {
+      const res = await fetch("/api/tasks/how-to", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskName: task.name,
+          description: task.description,
+          category: task.category,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHowToCache((prev) => ({ ...prev, [task.id]: data.howTo }));
+      } else {
+        const msg = res.status === 503 ? "How-to guides are not configured for this app." : "Unable to load how-to guide.";
+        setHowToCache((prev) => ({ ...prev, [task.id]: msg }));
+      }
+    } catch {
+      setHowToCache((prev) => ({ ...prev, [task.id]: "Unable to load how-to guide." }));
+    } finally {
+      setHowToLoading(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!learnMoreTask) return;
+    const hasGuidance = learnMoreTask.template?.educationalContent?.diyGuidance;
+    if (hasGuidance || howToCache[learnMoreTask.id]) return;
+    fetchHowTo(learnMoreTask);
+  }, [learnMoreTask, howToCache, fetchHowTo]);
 
   const fetchTasks = async () => {
     setLoading(true);
@@ -160,6 +200,40 @@ export default function TasksPage() {
     return new Date(dueDate) < new Date() && !completed;
   };
 
+  // Task category → system type (for "add system" recommendation)
+  const categoryToSystemType: Record<string, string> = {
+    HVAC: "HVAC",
+    PLUMBING: "PLUMBING",
+    ELECTRICAL: "ELECTRICAL",
+    EXTERIOR: "ROOF",
+    APPLIANCE: "APPLIANCE",
+  };
+
+  const homeHasRelevantSystemWithDetails = (task: Task) => {
+    const systemType = categoryToSystemType[task.category];
+    if (!systemType || !task.home.systems?.length) return false;
+    const match = task.home.systems.find(
+      (s) => s.systemType === systemType || (systemType === "ROOF" && s.systemType === "EXTERIOR")
+    );
+    return !!(match && (match.brand || match.model));
+  };
+
+  const shouldRecommendAddingSystem = (task: Task) => {
+    return categoryToSystemType[task.category] != null && !homeHasRelevantSystemWithDetails(task);
+  };
+
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (sortBy === "dueDate") {
+      return new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
+    }
+    if (sortBy === "category") {
+      const cat = a.category.localeCompare(b.category);
+      return cat !== 0 ? cat : new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
+    }
+    const name = a.name.localeCompare(b.name);
+    return name !== 0 ? name : new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -217,6 +291,17 @@ export default function TasksPage() {
             <SelectItem value="true">Completed</SelectItem>
           </SelectContent>
         </Select>
+
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as "dueDate" | "category" | "name")}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="dueDate">Due date</SelectItem>
+            <SelectItem value="category">Category</SelectItem>
+            <SelectItem value="name">Name</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Tasks List */}
@@ -230,7 +315,7 @@ export default function TasksPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {tasks.map((task) => (
+          {sortedTasks.map((task) => (
             <Card key={task.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -291,52 +376,101 @@ export default function TasksPage() {
                     <span>Est. Cost: ${task.costEstimate.toFixed(2)}</span>
                   )}
                 </div>
-                {task.template?.educationalContent && (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="link" className="mt-4">
-                        Learn More
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{task.name}</DialogTitle>
-                        <DialogDescription>
-                          {task.template.educationalContent.whyImportant && (
-                            <div className="mt-4">
-                              <h4 className="font-semibold mb-2">
-                                Why This Matters
-                              </h4>
-                              <p className="text-sm">
-                                {task.template.educationalContent.whyImportant}
-                              </p>
-                            </div>
-                          )}
-                          {task.template.educationalContent.diyGuidance && (
-                            <div className="mt-4">
-                              <h4 className="font-semibold mb-2">DIY Guide</h4>
-                              <p className="text-sm">
-                                {task.template.educationalContent.diyGuidance}
-                              </p>
-                            </div>
-                          )}
-                          {task.template.diyDifficulty && (
-                            <div className="mt-4">
-                              <Badge>
-                                Difficulty: {task.template.diyDifficulty}
-                              </Badge>
-                            </div>
-                          )}
-                        </DialogDescription>
-                      </DialogHeader>
-                    </DialogContent>
-                  </Dialog>
+
+                {shouldRecommendAddingSystem(task) && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground border-l-2 border-l-muted-foreground/30 pl-2 py-0.5">
+                    <Wrench className="h-3 w-3 shrink-0" />
+                    Add {task.category.toLowerCase()} with brand/model for better recommendations.{" "}
+                    <Link href="/homes" className="font-medium text-foreground underline hover:no-underline">
+                      Homes
+                    </Link>
+                  </p>
                 )}
+
+                <Button
+                  variant="link"
+                  className="mt-4 gap-1.5"
+                  onClick={() => {
+                    setLearnMoreTask(task);
+                    setLearnMoreOpen(true);
+                  }}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Learn More
+                </Button>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <Dialog open={learnMoreOpen} onOpenChange={(open) => { setLearnMoreOpen(open); if (!open) setLearnMoreTask(null); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          {learnMoreTask && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{learnMoreTask.name}</DialogTitle>
+                <DialogDescription asChild>
+                  <div className="space-y-4">
+                    {learnMoreTask.template?.educationalContent?.whyImportant && (
+                      <div>
+                        <h4 className="font-semibold mb-2">Why This Matters</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {learnMoreTask.template.educationalContent.whyImportant}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-semibold mb-2">How To (DIY)</h4>
+                      {learnMoreTask.template?.educationalContent?.diyGuidance ? (
+                        <>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {learnMoreTask.template.educationalContent.diyGuidance}
+                          </p>
+                          {learnMoreTask.template?.diyDifficulty && (
+                            <Badge variant="secondary">
+                              Difficulty: {learnMoreTask.template.diyDifficulty}
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {howToLoading === learnMoreTask.id ? (
+                            <p className="text-sm text-muted-foreground">Loading how-to guide…</p>
+                          ) : howToCache[learnMoreTask.id] ? (
+                            <>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-2">
+                                {howToCache[learnMoreTask.id]}
+                              </p>
+                              {learnMoreTask.template?.diyDifficulty && (
+                                <Badge variant="secondary">
+                                  Difficulty: {learnMoreTask.template.diyDifficulty}
+                                </Badge>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">Unable to load how-to guide.</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {shouldRecommendAddingSystem(learnMoreTask) && (
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground border-l-2 border-l-muted-foreground/30 pl-2 py-0.5">
+                        <Wrench className="h-3 w-3 shrink-0" />
+                        Add {learnMoreTask.category.toLowerCase()} with brand/model in{" "}
+                        <Link href="/homes" className="font-medium text-foreground underline hover:no-underline">
+                          Home settings
+                        </Link>{" "}
+                        for better AI guidance.
+                      </p>
+                    )}
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
