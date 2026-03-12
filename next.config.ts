@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Use cwd as Turbopack root when running from app dir (avoids parent lockfile warning).
+  turbopack: { root: process.cwd() },
   // Standalone only for Docker/self-hosted. Vercel uses its own serverless output.
   output:
     process.env.NODE_ENV === "production" && !process.env.VERCEL
