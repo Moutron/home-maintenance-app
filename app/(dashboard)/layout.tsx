@@ -1,38 +1,15 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import {
-  Home,
-  Calendar,
-  ListTodo,
-  DollarSign,
-  Settings,
-  Menu,
-  History,
-  FileText,
-  Shield,
-  Hammer,
-  Wrench,
-} from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
-
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Homes", href: "/homes", icon: Home },
-  { name: "Tasks", href: "/tasks", icon: ListTodo },
-  { name: "DIY Projects", href: "/diy-projects", icon: Hammer },
-  { name: "Tool Inventory", href: "/tools", icon: Wrench },
-  { name: "Calendar", href: "/calendar", icon: Calendar },
-  { name: "History", href: "/maintenance-history", icon: History },
-  { name: "Warranties", href: "/warranties", icon: FileText },
-  { name: "Compliance", href: "/compliance", icon: Shield },
-  { name: "Budget", href: "/budget", icon: DollarSign },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
+import { DashboardNav } from "@/components/dashboard-nav";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { navigation } from "@/lib/dashboard-nav-config";
 
 export default function DashboardLayout({
   children,
@@ -40,9 +17,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Mobile header */}
-      <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background px-4 lg:hidden">
+    <div className="flex min-h-dvh flex-col">
+      {/* Mobile header: menu + user only — branding moved to footer */}
+      <header className="sticky top-0 z-50 flex h-14 shrink-0 items-center justify-between border-b bg-background px-4 lg:hidden">
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -51,19 +28,18 @@ export default function DashboardLayout({
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64">
-            <nav className="flex flex-col gap-4">
-              <Link href="/" className="mb-4 text-xl font-bold">
-                Home Maintenance Pro
-              </Link>
+            <nav className="flex flex-col gap-1 pt-2">
               {navigation.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
                   >
-                    <Icon className="h-5 w-5" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/50">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    </span>
                     {item.name}
                   </Link>
                 );
@@ -71,62 +47,48 @@ export default function DashboardLayout({
             </nav>
           </SheetContent>
         </Sheet>
-        <div className="flex-1">
-          <Link href="/" className="text-lg font-bold">
-            Home Maintenance Pro
-          </Link>
-        </div>
         <UserButton />
       </header>
 
-      <div className="flex flex-1">
-        {/* Desktop sidebar */}
-        <aside className="hidden w-64 border-r bg-background lg:block">
-          <div className="flex h-full flex-col">
-            <div className="flex h-16 items-center border-b px-6">
-              <Link href="/" className="text-xl font-bold">
-                Home Maintenance Pro
-              </Link>
-            </div>
-            <nav className="flex-1 space-y-1 px-3 py-4">
-              {navigation.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-                  >
-                    <Icon className="h-5 w-5" />
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="border-t p-4">
+      <div className="flex min-h-0 flex-1">
+        {/* Desktop sidebar: nav + user — section labels, active state, hover life */}
+        <aside className="hidden w-56 shrink-0 border-r bg-background lg:flex lg:flex-col">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <DashboardNav />
+            <div className="shrink-0 border-t p-3">
               <UserButton />
             </div>
           </div>
         </aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto p-6">{children}</div>
-        </main>
-
-        {/* Footer with legal links */}
-        <footer className="border-t py-4">
-          <div className="container mx-auto flex flex-wrap items-center justify-center gap-4 px-6 text-sm text-muted-foreground">
-            <span>&copy; {new Date().getFullYear()} Home Maintenance Pro</span>
-            <Link href="/privacy" className="hover:text-foreground underline">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="hover:text-foreground underline">
-              Terms of Service
-            </Link>
+        {/* Main content — fills remaining space; only this area scrolls when needed */}
+        <main className="min-h-0 flex-1 overflow-y-auto pb-16 lg:pb-0">
+          <div className="container mx-auto min-h-full px-4 py-4 sm:px-6 sm:py-6">
+            {children}
           </div>
-        </footer>
+        </main>
       </div>
+
+      {/* Mobile bottom navigation for quick access between main sections */}
+      <MobileBottomNav />
+
+      {/* Footer: always at bottom of viewport */}
+      <footer className="shrink-0 border-t bg-muted/30 py-2.5">
+        <div className="container mx-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-1 px-6 text-sm text-muted-foreground">
+          <Link href="/" className="font-semibold hover:text-foreground">
+            Home Maintenance Pro
+          </Link>
+          <Link href="/privacy" className="hover:text-foreground underline">
+            Privacy Policy
+          </Link>
+          <Link href="/terms" className="hover:text-foreground underline">
+            Terms of Service
+          </Link>
+          <span className="w-full text-center lg:w-auto">
+            &copy; {new Date().getFullYear()} Home Maintenance Pro
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }

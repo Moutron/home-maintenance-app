@@ -252,9 +252,9 @@ export default function TasksPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Select value={filterHomeId} onValueChange={setFilterHomeId}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="All Homes" />
           </SelectTrigger>
           <SelectContent>
@@ -268,7 +268,7 @@ export default function TasksPage() {
         </Select>
 
         <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
@@ -282,7 +282,7 @@ export default function TasksPage() {
         </Select>
 
         <Select value={filterCompleted} onValueChange={setFilterCompleted}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="All Tasks" />
           </SelectTrigger>
           <SelectContent>
@@ -293,7 +293,7 @@ export default function TasksPage() {
         </Select>
 
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as "dueDate" | "category" | "name")}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
