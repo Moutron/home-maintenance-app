@@ -15,6 +15,7 @@ export type TaskCategory =
   | "APPLIANCE"
   | "SAFETY"
   | "ELECTRICAL"
+  | "VEHICLE"
   | "OTHER";
 
 export type TaskFrequency =

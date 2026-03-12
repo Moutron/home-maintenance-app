@@ -44,6 +44,14 @@ export function createMockPrisma() {
       update: vi.fn(),
       delete: vi.fn(),
     },
+    vehicle: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
     maintenanceTask: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -260,6 +268,18 @@ export const testData = {
     frequency: "MONTHLY" as const,
     nextDueDate: new Date("2024-12-31"),
     completed: false,
+  },
+  vehicle: {
+    id: "vehicle_test123",
+    userId: "user_test123",
+    nickname: "Daily driver",
+    year: 2020,
+    make: "Honda",
+    model: "Civic",
+    trim: "EX",
+    vin: null,
+    currentMileage: 35000,
+    purchaseDate: null,
   },
   budgetPlan: {
     id: "budget_test123",

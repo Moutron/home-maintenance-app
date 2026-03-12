@@ -44,6 +44,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { 
   generateSystemsFromPropertyData, 
   generateAppliancesFromPropertyData 
@@ -75,7 +81,9 @@ const HOME_TYPES = [
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(1); // Step 1: Basic info, Step 2: System selection, Step 3: System details
+  const [step, setStep] = useState<1 | 2 | 3>(1); // Step 1: Basic info, Step 2: Weather & climate, Step 3: Systems (optional)
+  const [inStep3Wizard, setInStep3Wizard] = useState(false); // When step 3: true = wizard, false = selection grid
+  const [currentSystemIndex, setCurrentSystemIndex] = useState(0); // Wizard: which system we're editing in Step 3
   const [selectedSystemTypes, setSelectedSystemTypes] = useState<string[]>([]);
   const [homeId, setHomeId] = useState<string | null>(null); // Store created home ID
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,6 +91,7 @@ export default function OnboardingPage() {
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [isLookingUpClimate, setIsLookingUpClimate] = useState(false);
   const [lookupStatus, setLookupStatus] = useState<"idle" | "success" | "not-found" | "error">("idle");
+  const [step1AccordionOpen, setStep1AccordionOpen] = useState<string | undefined>(undefined);
   const [climateData, setClimateData] = useState<any>(null);
   const [enrichedPropertyData, setEnrichedPropertyData] = useState<any>(null);
   const form = useForm<CreateHomeInput>({
@@ -107,189 +116,91 @@ export default function OnboardingPage() {
 
   const systems = form.watch("systems");
   const address = form.watch("address");
+
+  // Reset system-detail wizard when entering Step 3 (show grid first)
+  useEffect(() => {
+    if (step === 3) {
+      setCurrentSystemIndex(0);
+      setInStep3Wizard(false);
+    }
+  }, [step]);
+
+  // Keep wizard index in bounds when systems are removed
+  const systemCount = systems?.length ?? 0;
+  useEffect(() => {
+    if (systemCount > 0 && currentSystemIndex >= systemCount) {
+      setCurrentSystemIndex(Math.max(0, systemCount - 1));
+    }
+  }, [systemCount, currentSystemIndex]);
   const city = form.watch("city");
   const state = form.watch("state");
   const zipCode = form.watch("zipCode");
 
   const canLookup = address && city && state && zipCode && zipCode.length >= 5;
 
-  // Step 1: Submit basic home info (without systems)
-  const onSubmitStep1 = async (data: CreateHomeInput) => {
-    console.log("=== STEP 1 FORM SUBMISSION START ===");
-    console.log("[1] Raw form data received:", JSON.stringify(data, null, 2));
-    console.log("[2] Data types:", {
-      address: typeof data.address,
-      city: typeof data.city,
-      state: typeof data.state,
-      zipCode: typeof data.zipCode,
-      yearBuilt: typeof data.yearBuilt,
-      homeType: typeof data.homeType,
+  // Step 1: Advance to Weather & Climate (no API yet)
+  const onSubmitStep1 = (data: CreateHomeInput) => {
+    setStep(2);
+  };
+
+  // Normalize and create home (used after Step 2 - Weather & Climate)
+  const createHomeWithClimate = async (data: CreateHomeInput) => {
+    let normalizedAddress = data.address;
+    if (normalizedAddress && typeof normalizedAddress === "string" && normalizedAddress.includes(",")) {
+      normalizedAddress = normalizedAddress.split(",")[0].trim();
+    }
+    let normalizedState = data.state;
+    if (normalizedState && typeof normalizedState === "string") {
+      normalizedState = normalizedState.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+    }
+    let normalizedZipCode = data.zipCode;
+    if (normalizedZipCode && typeof normalizedZipCode === "string") {
+      normalizedZipCode = normalizedZipCode.trim().replace(/[^\d-]/g, "");
+      if (normalizedZipCode.length === 9 && !normalizedZipCode.includes("-")) {
+        normalizedZipCode = `${normalizedZipCode.slice(0, 5)}-${normalizedZipCode.slice(5)}`;
+      }
+      if (normalizedZipCode.length > 5 && !normalizedZipCode.includes("-")) {
+        normalizedZipCode = normalizedZipCode.slice(0, 5);
+      }
+    }
+    const normalizedData = {
+      ...data,
+      address: normalizedAddress,
+      zipCode: normalizedZipCode,
+      state: normalizedState,
+      systems: [],
+    };
+    if (!normalizedState || normalizedState.length !== 2) {
+      throw new Error(`State must be exactly 2 characters. Received: "${normalizedState}"`);
+    }
+    if (!normalizedZipCode || !/^\d{5}(-\d{4})?$/.test(normalizedZipCode)) {
+      throw new Error(`Invalid ZIP code format. Expected: 12345 or 12345-6789. Received: "${normalizedZipCode}"`);
+    }
+    const response = await fetch("/api/homes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(normalizedData),
     });
-    console.log("[3] Raw values:", {
-      address: data.address,
-      city: data.city,
-      state: data.state,
-      zipCode: data.zipCode,
-      stateLength: data.state?.length,
-      zipCodeLength: data.zipCode?.length,
-    });
-    
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = errorData.message || errorData.error || "Failed to create home";
+      const errorDetails = errorData.details
+        ? Array.isArray(errorData.details)
+          ? errorData.details.map((d: { field?: string; message?: string; received?: unknown }) => `${d.field}: ${d.message}`).join("\n")
+          : errorData.details
+        : "";
+      throw new Error(errorDetails ? `${errorMessage}\n\n${errorDetails}` : errorMessage);
+    }
+    const result = await response.json();
+    setHomeId(result.home.id);
+  };
+
+  // Step 2: Submit weather/climate and create home, then go to Systems (optional)
+  const onSubmitStep2Weather = async (data: CreateHomeInput) => {
     setIsSubmitting(true);
     try {
-      // Normalize address - extract just the street address (before first comma)
-      let normalizedAddress = data.address;
-      console.log("[4] Address normalization:", {
-        original: data.address,
-        type: typeof data.address,
-        includesComma: typeof data.address === 'string' && data.address.includes(','),
-      });
-      if (normalizedAddress && typeof normalizedAddress === 'string' && normalizedAddress.includes(',')) {
-        normalizedAddress = normalizedAddress.split(',')[0].trim();
-        console.log("[5] Address after normalization:", normalizedAddress);
-      }
-      
-      // Normalize state: extract only letters, uppercase, take first 2 chars
-      let normalizedState = data.state;
-      console.log("[6] State normalization start:", {
-        original: data.state,
-        type: typeof data.state,
-        isString: typeof data.state === 'string',
-      });
-      if (normalizedState && typeof normalizedState === 'string') {
-        const beforeNormalize = normalizedState;
-        normalizedState = normalizedState.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2);
-        console.log("[7] State normalization:", {
-          before: beforeNormalize,
-          after: normalizedState,
-          length: normalizedState.length,
-        });
-      } else {
-        console.warn("[7] State is not a string:", normalizedState, typeof normalizedState);
-      }
-      
-      // Normalize ZIP code: remove all non-digits except dash
-      let normalizedZipCode = data.zipCode;
-      console.log("[8] ZIP code normalization start:", {
-        original: data.zipCode,
-        type: typeof data.zipCode,
-        isString: typeof data.zipCode === 'string',
-      });
-      if (normalizedZipCode && typeof normalizedZipCode === 'string') {
-        const beforeNormalize = normalizedZipCode;
-        normalizedZipCode = normalizedZipCode.trim().replace(/[^\d-]/g, '');
-        console.log("[9] ZIP code after trim/replace:", normalizedZipCode);
-        
-        // If 9 digits without dash, format as 12345-6789
-        if (normalizedZipCode.length === 9 && !normalizedZipCode.includes('-')) {
-          normalizedZipCode = `${normalizedZipCode.slice(0, 5)}-${normalizedZipCode.slice(5)}`;
-          console.log("[10] ZIP code formatted to extended:", normalizedZipCode);
-        }
-        // If longer than 5 digits without dash, take first 5
-        if (normalizedZipCode.length > 5 && !normalizedZipCode.includes('-')) {
-          normalizedZipCode = normalizedZipCode.slice(0, 5);
-          console.log("[11] ZIP code truncated to 5 digits:", normalizedZipCode);
-        }
-        console.log("[12] ZIP code normalization complete:", {
-          before: beforeNormalize,
-          after: normalizedZipCode,
-          length: normalizedZipCode.length,
-          matchesPattern: /^\d{5}(-\d{4})?$/.test(normalizedZipCode),
-        });
-      } else {
-        console.warn("[9] ZIP code is not a string:", normalizedZipCode, typeof normalizedZipCode);
-      }
-      
-      // Normalize ZIP code and state before sending
-      const normalizedData = {
-        ...data,
-        address: normalizedAddress,
-        zipCode: normalizedZipCode,
-        state: normalizedState,
-        systems: [], // Don't include systems in step 1
-      };
-      
-      console.log("[13] Final normalized data object:", JSON.stringify(normalizedData, null, 2));
-      console.log("[14] Normalized values check:", {
-        state: normalizedState,
-        stateLength: normalizedState?.length,
-        stateIsValid: normalizedState && normalizedState.length === 2,
-        zipCode: normalizedZipCode,
-        zipCodeLength: normalizedZipCode?.length,
-        zipCodeMatchesPattern: normalizedZipCode && /^\d{5}(-\d{4})?$/.test(normalizedZipCode),
-      });
-      
-      // Validate normalized data one more time before sending
-      if (!normalizedState || normalizedState.length !== 2) {
-        console.error("[ERROR] State validation failed:", {
-          normalizedState,
-          length: normalizedState?.length,
-        });
-        throw new Error(`State must be exactly 2 characters. Received: "${normalizedState}" (length: ${normalizedState?.length})`);
-      }
-      if (!normalizedZipCode || !/^\d{5}(-\d{4})?$/.test(normalizedZipCode)) {
-        console.error("[ERROR] ZIP code validation failed:", {
-          normalizedZipCode,
-          length: normalizedZipCode?.length,
-          patternTest: normalizedZipCode ? /^\d{5}(-\d{4})?$/.test(normalizedZipCode) : false,
-        });
-        throw new Error(`Invalid ZIP code format. Expected: 12345 or 12345-6789. Received: "${normalizedZipCode}" (length: ${normalizedZipCode?.length})`);
-      }
-      
-      console.log("[15] Pre-flight validation passed, sending to API...");
-      
-      console.log("[16] Sending normalized data to API:", JSON.stringify(normalizedData, null, 2));
-      
-      const response = await fetch("/api/homes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(normalizedData),
-      });
-
-      console.log("[17] API response status:", response.status, response.statusText);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("[18] API error response:", JSON.stringify(errorData, null, 2));
-        
-        const errorMessage = errorData.message || errorData.error || "Failed to create home";
-        const errorDetails = errorData.details 
-          ? (Array.isArray(errorData.details) 
-              ? errorData.details.map((d: any) => {
-                  console.error(`[19] Error detail - ${d.field}:`, {
-                    message: d.message,
-                    code: d.code,
-                    received: d.received,
-                    receivedType: typeof d.received,
-                  });
-                  return `${d.field}: ${d.message}${d.received !== undefined ? ` (received: "${d.received}" [${typeof d.received}])` : ""}`;
-                }).join("\n")
-              : errorData.details)
-          : "";
-        
-        // Log debug info if available
-        if (errorData.debug) {
-          console.error("[20] Debug info from server:", JSON.stringify(errorData.debug, null, 2));
-        }
-        
-        throw new Error(errorDetails ? `${errorMessage}\n\nDetails:\n${errorDetails}` : errorMessage);
-      }
-      
-      console.log("[21] ✅ API request successful");
-
-      const result = await response.json();
-      setHomeId(result.home.id);
-      
-      // Show success message
-      if (result.isUpdate) {
-        console.log("Home updated successfully");
-      } else {
-        console.log("Home created successfully");
-      }
-      
-      // Move to step 2 (system selection)
-      setStep(2);
+      await createHomeWithClimate(data);
+      setStep(3);
     } catch (error) {
       console.error("Error creating home:", error);
       alert(error instanceof Error ? error.message : "Failed to create home");
@@ -298,8 +209,8 @@ export default function OnboardingPage() {
     }
   };
 
-  // Step 2: Add systems (optional, can skip)
-  const onSubmitStep2 = async () => {
+  // Step 3: Add systems (optional, can skip)
+  const onSubmitStep3Systems = async () => {
     if (!homeId) {
       alert("Home ID not found. Please go back and complete step 1.");
       return;
@@ -510,19 +421,19 @@ export default function OnboardingPage() {
           form.setValue("averageSnowfall", data.averageSnowfall);
         }
 
-        // Auto-populate systems from property data
+        // Auto-populate systems from property data (when enrichment returns heatingType, coolingType, roofType, etc.)
         const yearBuilt = data.yearBuilt || form.getValues("yearBuilt");
         const autoSystems = generateSystemsFromPropertyData(data, yearBuilt);
         
         if (autoSystems.length > 0) {
           const currentSystems = form.getValues("systems") || [];
-          // Only add systems that don't already exist (by type)
           const existingSystemTypes = new Set(currentSystems.map((s: any) => s.systemType));
           const newSystems = autoSystems.filter(s => !existingSystemTypes.has(s.systemType));
           
           if (newSystems.length > 0) {
             const merged = [...currentSystems, ...newSystems] as CreateHomeInput["systems"];
             form.setValue("systems", merged);
+            setSelectedSystemTypes(merged.map((s: { systemType: string }) => s.systemType));
             console.log(`Auto-populated ${newSystems.length} system(s):`, newSystems.map(s => s.systemType).join(", "));
           }
         }
@@ -559,7 +470,7 @@ export default function OnboardingPage() {
         // Check if API key is required
         if (result.requiresApiKey) {
           setLookupStatus("error");
-          alert("Property lookup API is not configured. Please enter property details manually.\n\nTo enable automatic lookup, add RAPIDAPI_KEY to your .env file. See README.md for setup instructions.");
+          alert("Property lookup API is not configured. Please enter property details manually.\n\nTo enable automatic lookup:\n• Local: add RAPIDAPI_KEY to .env\n• Vercel: add RAPIDAPI_KEY in Project → Settings → Environment Variables (Production + Preview), then redeploy.");
         } else {
           setLookupStatus("not-found");
         }
@@ -620,197 +531,271 @@ export default function OnboardingPage() {
     }
   };
 
-  // Auto-fetch climate data when address is complete
+  // Auto-fetch climate data when address is complete (step 1) or when entering step 2
   useEffect(() => {
     if (canLookup && !climateData && !isLookingUpClimate) {
       lookupClimateData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canLookup]);
+  }, [canLookup, step]);
 
+  // When Zillow lookup succeeds, open "More options" so the user sees results without scrolling
+  useEffect(() => {
+    if (lookupStatus === "success") setStep1AccordionOpen("more");
+  }, [lookupStatus]);
+
+  // Reset lookup status when address changes so we can auto re-fetch if they edit (stable deps to avoid array-size warning)
+  const addressKey = `${address ?? ""}|${city ?? ""}|${state ?? ""}|${zipCode ?? ""}`;
+  useEffect(() => {
+    setLookupStatus((prev) => (prev !== "idle" ? "idle" : prev));
+  }, [addressKey]);
+
+  // Auto-run property lookup when address is complete (no button click required) (stable deps)
+  const propertyLookupTrigger = `${step}-${!!canLookup}-${lookupStatus}-${isLookingUp}`;
+  useEffect(() => {
+    if (step !== 1 || !canLookup || isLookingUp) return;
+    if (lookupStatus !== "idle" && lookupStatus !== "not-found" && lookupStatus !== "error") return;
+    const t = setTimeout(() => {
+      lookupProperty();
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propertyLookupTrigger]);
+
+  const step1HasResults = step === 1 && lookupStatus === "success";
+  const step3WizardActive = step === 3 && inStep3Wizard;
   return (
-    <div className="mx-auto max-w-2xl">
-      <Card>
-        <CardHeader>
+    <div
+      className={
+        step3WizardActive
+          ? "mx-auto flex h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] max-w-2xl flex-col"
+          : step === 1 && !step1HasResults
+            ? "mx-auto flex h-[calc(100vh-14rem)] max-h-[calc(100vh-14rem)] max-w-2xl flex-col"
+            : "mx-auto max-w-2xl"
+      }
+    >
+      <Card
+        className={
+          step3WizardActive
+            ? "flex flex-1 flex-col min-h-0"
+            : step === 1 && !step1HasResults
+              ? "flex flex-1 flex-col min-h-0"
+              : undefined
+        }
+      >
+        <CardHeader className={step === 1 || step === 3 ? "shrink-0" : undefined}>
           <CardTitle>Welcome! Let's set up your home</CardTitle>
           <CardDescription>
-            {step === 1 
+            {step === 1
               ? "Tell us about your home so we can create a personalized maintenance schedule."
-              : "Add your home systems (optional). You can skip this step and add systems later."}
+              : step === 2
+                ? "Weather and climate help us tailor tasks to your area."
+                : "Add your home systems (optional). You can skip this step and add systems later."}
           </CardDescription>
-          {/* Step indicator */}
-          <div className="flex items-center gap-2 mt-4">
-            <div className={`flex items-center gap-2 ${step >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                1
+          {/* Step indicator: even layout, completed steps show checkmark */}
+          <div className="flex items-center w-full mt-5">
+            {/* Step 1 */}
+            <div className="flex flex-1 items-center min-w-0">
+              <div className="flex items-center gap-2 shrink-0">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                    step > 1
+                      ? "bg-primary text-primary-foreground"
+                      : step === 1
+                        ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background"
+                        : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {step > 1 ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-semibold">1</span>}
+                </div>
+                <span className={`text-sm font-medium hidden sm:inline ${step >= 1 ? "text-foreground" : "text-muted-foreground"}`}>
+                  Basic Info
+                </span>
               </div>
-              <span className="text-sm font-medium">Basic Info</span>
+              <div className={`flex-1 h-0.5 mx-2 min-w-[12px] transition-colors ${step > 1 ? "bg-primary" : "bg-muted"}`} />
             </div>
-            <div className="h-0.5 w-8 bg-muted" />
-            <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                2
+            {/* Step 2 */}
+            <div className="flex flex-1 items-center min-w-0">
+              <div className="flex items-center gap-2 shrink-0">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                    step > 2
+                      ? "bg-primary text-primary-foreground"
+                      : step === 2
+                        ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background"
+                        : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {step > 2 ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-semibold">2</span>}
+                </div>
+                <span className={`text-sm font-medium hidden sm:inline ${step >= 2 ? "text-foreground" : "text-muted-foreground"}`}>
+                  Weather
+                </span>
               </div>
-              <span className="text-sm font-medium">Systems (Optional)</span>
+              <div className={`flex-1 h-0.5 mx-2 min-w-[12px] transition-colors ${step > 2 ? "bg-primary" : "bg-muted"}`} />
+            </div>
+            {/* Step 3 */}
+            <div className="flex flex-1 items-center min-w-0">
+              <div className="flex items-center gap-2 shrink-0">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                    step === 3
+                      ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <span className="text-sm font-semibold">3</span>
+                </div>
+                <span className={`text-sm font-medium hidden sm:inline ${step >= 3 ? "text-foreground" : "text-muted-foreground"}`}>
+                  Systems (optional)
+                </span>
+              </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent
+          className={
+            step3WizardActive
+              ? "flex flex-1 flex-col min-h-0 overflow-hidden p-6"
+              : step === 3
+                ? "p-6"
+                : step === 1 && !step1HasResults
+                  ? "flex flex-1 flex-col min-h-0 overflow-hidden p-6"
+                  : step === 1
+                    ? "p-6"
+                    : undefined
+          }
+        >
           <Form {...form}>
             {step === 1 ? (
-              <form onSubmit={form.handleSubmit(onSubmitStep1)} className="space-y-6">
-              {/* Address Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Home Address</h3>
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Street Address</FormLabel>
-                      <FormControl>
-                        <AddressAutocomplete
-                          value={field.value}
-                          onChange={(address, components) => {
-                            // Use the parsed street address from components, not the full formatted address
-                            const streetAddress = components.address || address.split(',')[0].trim();
-                            field.onChange(streetAddress);
-                            // Auto-fill city, state, and zipCode when address is selected
-                            form.setValue("city", components.city);
-                            form.setValue("state", components.state);
-                            form.setValue("zipCode", components.zipCode);
-                          }}
-                          placeholder="Start typing your address..."
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Start typing your address and select from suggestions
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
+              <form
+                onSubmit={form.handleSubmit(onSubmitStep1)}
+                className={step1HasResults ? "space-y-4" : "flex min-h-0 flex-1 flex-col"}
+              >
+              <div
+                className={
+                  step1HasResults
+                    ? "-mx-1 px-1 space-y-3"
+                    : "min-h-0 flex-1 overflow-y-auto -mx-1 px-1 space-y-3"
+                }
+              >
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Home Address</h3>
                   <FormField
                     control={form.control}
-                    name="city"
+                    name="address"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City</FormLabel>
+                      <FormItem className="space-y-1">
+                        <FormLabel className="text-xs">Street Address</FormLabel>
                         <FormControl>
-                          <Input placeholder="City" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="state"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>State</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="CA"
-                            maxLength={2}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(e.target.value.toUpperCase())
-                            }
+                          <AddressAutocomplete
+                            value={field.value}
+                            onChange={(address, components) => {
+                              const streetAddress = components.address || address.split(",")[0].trim();
+                              field.onChange(streetAddress);
+                              form.setValue("city", components.city);
+                              form.setValue("state", components.state);
+                              form.setValue("zipCode", components.zipCode);
+                            }}
+                            placeholder="Start typing your address..."
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="zipCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ZIP Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="12345" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                {/* Property Lookup Button */}
-                <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-2">
+                    <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="text-xs">City</FormLabel>
+                          <FormControl>
+                            <Input className="h-9" placeholder="City" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="text-xs">State</FormLabel>
+                          <FormControl>
+                            <Input
+                              className="h-9 w-14"
+                              placeholder="CA"
+                              maxLength={2}
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="zipCode"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          <FormLabel className="text-xs">ZIP</FormLabel>
+                          <FormControl>
+                            <Input className="h-9" placeholder="12345" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
                     onClick={lookupProperty}
                     disabled={!canLookup || isLookingUp}
-                    className="w-full"
+                    className="w-full h-9"
                   >
-                    {isLookingUp ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Looking up property...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="mr-2 h-4 w-4" />
-                        Auto-fill from Zillow/Redfin
-                      </>
-                    )}
+                    {isLookingUp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                    {isLookingUp ? "Looking up..." : "Auto-fill from Zillow/Redfin"}
                   </Button>
+                  {lookupStatus === "success" && (
+                    <Alert className="border-green-200 bg-green-50 py-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-800 text-xs">Property found and auto-filled. Review in More options if needed.</AlertDescription>
+                    </Alert>
+                  )}
+                  {lookupStatus === "not-found" && (
+                    <Alert className="border-yellow-200 bg-yellow-50 py-2">
+                      <XCircle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription className="text-yellow-800 text-xs">Not found online. Enter details below.</AlertDescription>
+                    </Alert>
+                  )}
+                  {lookupStatus === "error" && (
+                    <Alert className="border-red-200 bg-red-50 py-2">
+                      <XCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-800 text-xs">Lookup error. Enter details manually.</AlertDescription>
+                    </Alert>
+                  )}
                 </div>
 
-                {/* Lookup Status Messages */}
-                {lookupStatus === "success" && (
-                  <Alert className="border-green-200 bg-green-50">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800">
-                      Property information found and auto-filled! Please review and adjust as needed.
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {lookupStatus === "not-found" && (
-                  <Alert className="border-yellow-200 bg-yellow-50">
-                    <XCircle className="h-4 w-4 text-yellow-600" />
-                    <AlertDescription className="text-yellow-800">
-                      Property information not found online. Please enter the details manually below.
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {lookupStatus === "error" && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <XCircle className="h-4 w-4 text-red-600" />
-                    <AlertDescription className="text-red-800">
-                      Error looking up property. Please enter the details manually below.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
               {/* Property Summary Card - Show enriched data */}
-              {enrichedPropertyData && lookupStatus === "success" && (
-                <PropertySummaryCard data={enrichedPropertyData} />
-              )}
-
-              {/* Home Details Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Home Details</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <FormField
                     control={form.control}
                     name="yearBuilt"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Year Built</FormLabel>
+                      <FormItem className="space-y-1">
+                        <FormLabel className="text-xs">Year Built</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
+                            className="h-9"
                             {...field}
-                            onChange={(e) =>
-                              field.onChange(parseInt(e.target.value))
-                            }
+                            onChange={(e) => field.onChange(parseInt(e.target.value))}
                           />
                         </FormControl>
                         <FormMessage />
@@ -821,28 +806,18 @@ export default function OnboardingPage() {
                     control={form.control}
                     name="homeType"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Home Type</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
+                      <FormItem className="space-y-1">
+                        <FormLabel className="text-xs">Home Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select home type" />
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {HOME_TYPES.map((type) => (
                               <SelectItem key={type} value={type}>
-                                {type
-                                  .split("-")
-                                  .map(
-                                    (word) =>
-                                      word.charAt(0).toUpperCase() +
-                                      word.slice(1)
-                                  )
-                                  .join(" ")}
+                                {type.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -852,182 +827,117 @@ export default function OnboardingPage() {
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="squareFootage"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Square Footage (optional)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            value={field.value ?? ""}
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value
-                                  ? parseInt(e.target.value)
-                                  : undefined
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lotSize"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lot Size in Acres (optional)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={field.value ?? ""}
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value
-                                  ? parseFloat(e.target.value)
-                                  : undefined
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                {/* Climate & Storm Information (Auto-filled) */}
-                <div className="space-y-4 pt-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Climate & Storm Information</h3>
-                    {isLookingUpClimate && (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
+
+                <Accordion
+                  type="single"
+                  collapsible
+                  className="w-full"
+                  value={step1AccordionOpen}
+                  onValueChange={setStep1AccordionOpen}
+                >
+                  <AccordionItem value="more" className="border rounded-lg">
+                    <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
+                      More options (square footage, lot size)
+                    </AccordionTrigger>
+                    <AccordionContent className="px-3 pb-3 pt-0 space-y-3">
+                      {enrichedPropertyData && lookupStatus === "success" && (
+                        <PropertySummaryCard data={enrichedPropertyData} />
+                      )}
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name="squareFootage"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="text-xs">Square Footage</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  className="h-9"
+                                  value={field.value ?? ""}
+                                  onChange={(e) =>
+                                    field.onChange(e.target.value ? parseInt(e.target.value) : undefined)
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="lotSize"
+                          render={({ field }) => (
+                            <FormItem className="space-y-1">
+                              <FormLabel className="text-xs">Lot Size (acres)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="h-9"
+                                  value={field.value ?? ""}
+                                  onChange={(e) =>
+                                    field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </div>
+
+              <div className="shrink-0 pt-4 border-t mt-3">
+                <Button type="submit" className="w-full h-9">
+                  Continue to Weather & Climate
+                </Button>
+              </div>
+            </form>
+            ) : step === 2 ? (
+              /* Step 2: Weather & Climate (required) */
+              <form onSubmit={form.handleSubmit(onSubmitStep2Weather)} className="space-y-6">
+                <p className="text-xs text-muted-foreground">
+                  Weather and climate help us tailor maintenance tasks to your area (e.g. storm prep, freeze alerts).
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold">Climate & Storm</h3>
+                    {isLookingUpClimate && <Loader2 className="h-3 w-3 animate-spin" />}
                     {climateData && (
-                      <Badge variant="outline" className="text-green-600">
+                      <Badge variant="outline" className="text-green-600 text-xs">
                         <CheckCircle2 className="mr-1 h-3 w-3" />
-                        Auto-filled
+                        Auto-filled from ZIP
                       </Badge>
                     )}
                   </div>
-                  <FormDescription>
-                    Climate data is automatically fetched based on your location. You can adjust these values if needed.
-                  </FormDescription>
-                  
-                  {climateData?.recommendations && climateData.recommendations.length > 0 && (
-                    <Alert className="border-blue-200 bg-blue-50">
-                      <AlertDescription className="text-blue-800">
-                        <strong>Climate Recommendations:</strong>
-                        <ul className="mt-2 list-disc list-inside space-y-1">
-                          {climateData.recommendations.map((rec: string, idx: number) => (
-                            <li key={idx} className="text-sm">{rec}</li>
-                          ))}
-                        </ul>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2">
                     <FormField
                       control={form.control}
                       name="stormFrequency"
                       render={({ field }) => (
-                        <FormItem>
-                          <div className="flex items-center gap-2">
-                            <FormLabel>Storm Frequency</FormLabel>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="inline-flex items-center justify-center rounded-full border border-transparent bg-transparent text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-                                  >
-                                    <Info className="h-4 w-4" />
-                                    <span className="sr-only">Learn more about storm frequency</span>
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-sm p-4" side="right">
-                                  <div className="space-y-3">
-                                    <h4 className="font-semibold text-sm">Understanding Storm Frequency</h4>
-                                    <p className="text-xs text-muted-foreground mb-3">
-                                      This helps us recommend the right maintenance schedule for your home based on historical weather patterns.
-                                    </p>
-                                    <div className="space-y-2 text-xs">
-                                      <div>
-                                        <span className="font-semibold text-green-600">Low:</span>
-                                        <p className="text-muted-foreground">Minimal storm activity. Standard maintenance schedules apply.</p>
-                                      </div>
-                                      <div>
-                                        <span className="font-semibold text-blue-600">Moderate:</span>
-                                        <p className="text-muted-foreground">Some storms (30+ days/year). Slightly more frequent exterior inspections recommended.</p>
-                                      </div>
-                                      <div>
-                                        <span className="font-semibold text-orange-600">High:</span>
-                                        <p className="text-muted-foreground">Frequent storms (50+ days/year) or tornado activity. More frequent roof and exterior maintenance needed.</p>
-                                      </div>
-                                      <div>
-                                        <span className="font-semibold text-red-600">Severe:</span>
-                                        <p className="text-muted-foreground">Hurricane-prone or extreme storm activity. Quarterly roof inspections and storm preparation tasks recommended.</p>
-                                      </div>
-                                    </div>
-                                    <div className="pt-2 border-t text-xs text-muted-foreground">
-                                      <p className="font-semibold mb-1">Why it matters:</p>
-                                      <ul className="list-disc list-inside space-y-1">
-                                        <li>More frequent roof inspections in storm-prone areas</li>
-                                        <li>Earlier gutter cleaning before storm seasons</li>
-                                        <li>Wind-rated equipment recommendations</li>
-                                        <li>Storm preparation task reminders</li>
-                                      </ul>
-                                    </div>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
+                        <FormItem className="space-y-1">
+                          <FormLabel className="text-xs">Storm Frequency</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value || ""}
                             defaultValue={field.value || ""}
                           >
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select storm frequency">
-                                  {field.value ? (
-                                    field.value === "low" ? "Low" :
-                                    field.value === "moderate" ? "Moderate" :
-                                    field.value === "high" ? "High" :
-                                    field.value === "severe" ? "Severe (Hurricane/Tornado prone)" :
-                                    field.value
-                                  ) : "Select storm frequency"}
-                                </SelectValue>
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Select" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="low">Low - Minimal storm activity</SelectItem>
-                              <SelectItem value="moderate">Moderate - Some storms (30+ days/year)</SelectItem>
-                              <SelectItem value="high">High - Frequent storms (50+ days/year)</SelectItem>
-                              <SelectItem value="severe">Severe - Hurricane/Tornado prone</SelectItem>
+                              <SelectItem value="low">Low</SelectItem>
+                              <SelectItem value="moderate">Moderate</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="severe">Severe</SelectItem>
                             </SelectContent>
                           </Select>
-                          <FormDescription>
-                            {climateData?.data?.hurricaneRisk && "🌀 Hurricane-prone area"}
-                            {climateData?.data?.tornadoRisk && " 🌪️ Tornado-prone area"}
-                            {climateData?.data?.hailRisk && " ⚡ Hail-prone area"}
-                            {field.value && (
-                              <span className="ml-2">
-                                {field.value === "low" && "✓ Standard maintenance schedule"}
-                                {field.value === "moderate" && "✓ Slightly increased exterior maintenance"}
-                                {field.value === "high" && "✓ More frequent roof/exterior inspections"}
-                                {field.value === "severe" && "✓ Quarterly inspections recommended"}
-                              </span>
-                            )}
-                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1036,43 +946,35 @@ export default function OnboardingPage() {
                       control={form.control}
                       name="windZone"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Wind Zone (optional)</FormLabel>
+                        <FormItem className="space-y-1">
+                          <FormLabel className="text-xs">Wind Zone</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="e.g., Zone 1, Zone 2" 
-                              {...field} 
-                              value={field.value || ""}
-                            />
+                            <Input className="h-9" placeholder="e.g. Zone 1" {...field} value={field.value || ""} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2">
                     <FormField
                       control={form.control}
                       name="averageRainfall"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Average Rainfall (inches/year)</FormLabel>
+                        <FormItem className="space-y-1">
+                          <FormLabel className="text-xs">Rainfall (in/yr)</FormLabel>
                           <FormControl>
-                            <Input 
+                            <Input
                               type="number"
                               step="0.1"
-                              placeholder="e.g., 40"
+                              className="h-9"
+                              placeholder="40"
                               value={field.value ?? ""}
                               onChange={(e) =>
                                 field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
                               }
                             />
                           </FormControl>
-                          {climateData?.data && (
-                            <FormDescription>
-                              Based on {city}, {state} location
-                            </FormDescription>
-                          )}
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1081,50 +983,55 @@ export default function OnboardingPage() {
                       control={form.control}
                       name="averageSnowfall"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Average Snowfall (inches/year)</FormLabel>
+                        <FormItem className="space-y-1">
+                          <FormLabel className="text-xs">Snowfall (in/yr)</FormLabel>
                           <FormControl>
-                            <Input 
+                            <Input
                               type="number"
                               step="0.1"
-                              placeholder="e.g., 30"
+                              className="h-9"
+                              placeholder="30"
                               value={field.value ?? ""}
                               onChange={(e) =>
                                 field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)
                               }
                             />
                           </FormControl>
-                          {climateData?.data && (
-                            <FormDescription>
-                              Based on {city}, {state} location
-                            </FormDescription>
-                          )}
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
                 </div>
-              </div>
-
-              {/* Step 1 Submit Button */}
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Continue to Systems (Optional)"}
-              </Button>
-            </form>
-            ) : step === 2 ? (
-              /* Step 2: System Selection */
-              <div className="space-y-6">
-                <div className="space-y-4">
+                <div className="flex gap-4">
+                  <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1">
+                    Back
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                    {isSubmitting ? "Creating..." : "Continue to Systems (Optional)"}
+                  </Button>
+                </div>
+              </form>
+            ) : step === 3 && !inStep3Wizard ? (
+              /* Step 3a: System Selection (optional) - compact grid to avoid scroll */
+              <div className="flex flex-col min-h-0">
+                <div className="space-y-2">
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">Select Systems to Add</h3>
-                    <FormDescription>
-                      Choose which systems and appliances you'd like to track in your home. 
-                      You can add details in the next step, or skip and add them later.
+                    <h3 className="text-base font-semibold mb-1">Add systems & appliances (optional)</h3>
+                    <FormDescription className="text-xs">
+                      You can finish now and get to your dashboard right away, or add systems below to get tailored maintenance tasks. You can add or change systems anytime later.
                     </FormDescription>
                   </div>
+
+                  {selectedSystemTypes.length === 0 && (
+                    <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/50 py-2.5">
+                      <AlertDescription className="text-xs text-blue-800 dark:text-blue-200">
+                        <strong>Two options:</strong> Click &quot;Finish & go to dashboard&quot; to create your home and see tasks now—no systems required. Or select any systems below, then continue to add details (or skip that step). Either way, you&apos;re done in one click.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-1">
                     {SYSTEM_TYPES.map((type) => {
                       const displayName = type
                         .split("_")
@@ -1145,16 +1052,17 @@ export default function OnboardingPage() {
                           }`}
                           onClick={() => handleSystemSelection(type, !isSelected)}
                         >
-                          <CardContent className="pt-4 pb-4">
-                            <div className="flex items-center space-x-2">
+                          <CardContent className="py-2 px-3">
+                            <div className="flex items-center gap-2 min-w-0">
                               <Checkbox
                                 checked={isSelected}
                                 onCheckedChange={(checked) =>
                                   handleSystemSelection(type, checked as boolean)
                                 }
                                 onClick={(e) => e.stopPropagation()}
+                                className="h-4 w-4 shrink-0"
                               />
-                              <label className="text-sm font-medium cursor-pointer flex-1">
+                              <label className="text-xs font-medium cursor-pointer truncate">
                                 {displayName}
                               </label>
                             </div>
@@ -1165,121 +1073,149 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                {/* Step 2 Actions */}
-                <div className="flex gap-4">
+                {/* Step 3 Actions - always visible below the grid */}
+                <div className="mt-4 pt-3 border-t flex gap-3 shrink-0">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setStep(1)}
+                    onClick={() => setStep(2)}
                     className="flex-1"
                   >
                     Back
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={onSubmitStep2}
+                    variant={selectedSystemTypes.length === 0 ? "default" : "outline"}
+                    onClick={onSubmitStep3Systems}
                     disabled={isAddingSystems}
                     className="flex-1"
                   >
-                    Skip
+                    {isAddingSystems ? "Finishing…" : "Finish & go to dashboard"}
                   </Button>
                   <Button
                     type="button"
+                    variant={selectedSystemTypes.length > 0 ? "default" : "outline"}
                     onClick={() => {
                       if (selectedSystemTypes.length > 0) {
-                        setStep(3);
+                        setInStep3Wizard(true);
                       } else {
-                        onSubmitStep2();
+                        onSubmitStep3Systems();
                       }
                     }}
                     disabled={selectedSystemTypes.length === 0}
                     className="flex-1"
                   >
-                    Continue to Details
+                    {selectedSystemTypes.length > 0 ? "Add details for selected" : "Add details"}
                   </Button>
                 </div>
               </div>
             ) : (
-              /* Step 3: System Details */
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">System Details</h3>
-                    <Badge variant="secondary">
-                      {systems?.length || 0} {systems?.length === 1 ? "system" : "systems"}
-                    </Badge>
-                  </div>
-                  <FormDescription>
-                    Add details for each system. You can use AI photo analysis to automatically fill in information, or enter it manually.
-                  </FormDescription>
-
-                {systems?.map((system, index) => (
-                  <Card key={index}>
-                    <CardContent className="pt-6">
-                      <div className="grid gap-4">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="font-medium">
-                              {systems[index]?.systemType
-                                ?.split("_")
-                                .map(
-                                  (word) =>
-                                    word.charAt(0) + word.slice(1).toLowerCase()
-                                )
-                                .join(" ") || `System ${index + 1}`}
-                            </h4>
-                            <p className="text-sm text-muted-foreground">
-                              System {index + 1} of {systems?.length || 0}
-                            </p>
-                          </div>
-                          <Button
+              /* Step 3b: System Details (wizard - one system at a time) */
+              (() => {
+                const totalSystems = systems?.length || 0;
+                const index = Math.min(currentSystemIndex, Math.max(0, totalSystems - 1));
+                const isFirst = index <= 0;
+                const isLast = totalSystems <= 1 || index >= totalSystems - 1;
+                const progressPct = totalSystems > 0 ? ((index + 1) / totalSystems) * 100 : 0;
+                return (
+              <div
+                className="flex min-h-0 flex-1 flex-col"
+                data-testid="system-details-wizard"
+              >
+                {/* Compact progress: single row + bar + dots */}
+                {totalSystems > 0 && (
+                  <div
+                    className="shrink-0 space-y-1.5 pb-3"
+                    data-testid="wizard-progress"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="text-sm font-medium text-muted-foreground shrink-0"
+                        data-testid="wizard-system-count"
+                      >
+                        System {index + 1} of {totalSystems}
+                      </span>
+                      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden min-w-0">
+                        <div
+                          className="h-full bg-primary transition-all duration-300"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        {Array.from({ length: totalSystems }).map((_, i) => (
+                          <button
+                            key={i}
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              removeSystem(index);
-                              const systemType = systems[index]?.systemType;
-                              if (systemType) {
-                                setSelectedSystemTypes(
-                                  selectedSystemTypes.filter(t => t !== systemType)
-                                );
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        
-                        {/* Photo Upload with AI Analysis */}
-                        <div className="border rounded-lg p-4 bg-muted/50">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Sparkles className="h-4 w-4 text-primary" />
-                            <FormLabel className="text-sm font-medium">
-                              AI Photo Analysis (Optional)
-                            </FormLabel>
-                          </div>
-                          <FormDescription className="mb-3">
-                            Take or upload a photo to automatically identify the system type, brand, model, age, and condition.
-                          </FormDescription>
-                          <SystemPhotoUpload
-                            onAnalysisComplete={(analysis) => handlePhotoAnalysis(index, analysis)}
-                            systemTypeHint={systems[index]?.systemType}
+                            onClick={() => setCurrentSystemIndex(i)}
+                            className={`h-1.5 rounded-full transition-all ${
+                              i === index ? "w-4 bg-primary" : i < index ? "w-1.5 bg-primary/60" : "w-1.5 bg-muted"
+                            }`}
+                            aria-label={`Go to system ${i + 1}`}
                           />
-                        </div>
-                        
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {index === 0
+                        ? "Add as much detail as you like, then continue."
+                        : `${index} of ${totalSystems} completed — ${totalSystems - index} to go.`}
+                    </p>
+                  </div>
+                )}
+
+                {/* Scrollable form body — fits viewport; only this area scrolls if needed */}
+                <div className="min-h-0 flex-1 overflow-y-auto -mx-1 px-1">
+                  {totalSystems > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        Add details for this system. Use AI photo analysis to auto-fill, or enter manually. You can skip optional fields.
+                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-sm font-medium">
+                          {systems[index]?.systemType
+                            ?.split("_")
+                            .map(
+                              (word) =>
+                                word.charAt(0) + word.slice(1).toLowerCase()
+                            )
+                            .join(" ") || `System ${index + 1}`}
+                        </h4>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 shrink-0"
+                          onClick={() => {
+                            removeSystem(index);
+                            const systemType = systems[index]?.systemType;
+                            if (systemType) {
+                              setSelectedSystemTypes(
+                                selectedSystemTypes.filter((t) => t !== systemType)
+                              );
+                            }
+                            setCurrentSystemIndex((i) =>
+                              Math.max(0, Math.min(i, totalSystems - 2))
+                            );
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Top row: System type, Brand, Model — always visible */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <FormField
                           control={form.control}
                           name={`systems.${index}.systemType`}
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>System Type</FormLabel>
+                            <FormItem className="space-y-1.5">
+                              <FormLabel className="text-xs">System Type</FormLabel>
                               <Select
                                 onValueChange={field.onChange}
                                 defaultValue={field.value}
                               >
                                 <FormControl>
-                                  <SelectTrigger>
+                                  <SelectTrigger className="h-9">
                                     <SelectValue />
                                   </SelectTrigger>
                                 </FormControl>
@@ -1302,253 +1238,292 @@ export default function OnboardingPage() {
                             </FormItem>
                           )}
                         />
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name={`systems.${index}.brand`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Brand (optional)</FormLabel>
-                                <FormControl>
-                                  <Input {...field} value={field.value || ""} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name={`systems.${index}.model`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Model (optional)</FormLabel>
-                                <FormControl>
-                                  <Input {...field} value={field.value || ""} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        {/* Material field - show for specific system types */}
-                        {(systems[index]?.systemType === "PLUMBING" || 
-                          systems[index]?.systemType === "ROOF" || 
-                          systems[index]?.systemType === "ELECTRICAL") && (
-                          <FormField
-                            control={form.control}
-                            name={`systems.${index}.material`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>
-                                  Material
-                                  {systems[index]?.systemType === "PLUMBING" && " (e.g., Copper, PVC, PEX)"}
-                                  {systems[index]?.systemType === "ROOF" && " (e.g., Asphalt Shingle, Metal, Tile)"}
-                                  {systems[index]?.systemType === "ELECTRICAL" && " (e.g., Aluminum, Copper)"}
-                                </FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    placeholder={
-                                      systems[index]?.systemType === "PLUMBING" ? "Copper, PVC, or PEX" :
-                                      systems[index]?.systemType === "ROOF" ? "Asphalt, Metal, Tile, etc." :
-                                      "Aluminum, Copper, etc."
-                                    }
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormDescription>
-                                  {systems[index]?.systemType === "PLUMBING" && "Copper pipes need different maintenance than PVC/PEX"}
-                                  {systems[index]?.systemType === "ROOF" && "Material affects inspection frequency and lifespan"}
-                                  {systems[index]?.systemType === "ELECTRICAL" && "Material type affects maintenance needs"}
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                        {/* Capacity field - show for electrical and water heater */}
-                        {(systems[index]?.systemType === "ELECTRICAL" || 
-                          systems[index]?.systemType === "WATER_HEATER") && (
-                          <FormField
-                            control={form.control}
-                            name={`systems.${index}.capacity`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>
-                                  Capacity
-                                  {systems[index]?.systemType === "ELECTRICAL" && " (e.g., 200A, 100A)"}
-                                  {systems[index]?.systemType === "WATER_HEATER" && " (e.g., 50 gal, 75 gal)"}
-                                </FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    placeholder={
-                                      systems[index]?.systemType === "ELECTRICAL" ? "200A" :
-                                      "50 gal"
-                                    }
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                        {/* Condition field */}
                         <FormField
                           control={form.control}
-                          name={`systems.${index}.condition`}
+                          name={`systems.${index}.brand`}
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Condition (optional)</FormLabel>
-                              <Select
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                              >
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select condition" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="excellent">Excellent</SelectItem>
-                                  <SelectItem value="good">Good</SelectItem>
-                                  <SelectItem value="fair">Fair</SelectItem>
-                                  <SelectItem value="poor">Poor</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormDescription>
-                                Poor/fair condition systems need more frequent maintenance
-                              </FormDescription>
+                            <FormItem className="space-y-1.5">
+                              <FormLabel className="text-xs">Brand</FormLabel>
+                              <FormControl>
+                                <Input
+                                  className="h-9"
+                                  {...field}
+                                  value={field.value || ""}
+                                  placeholder="Optional"
+                                />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                        {/* Storm resistance - show for roof */}
-                        {systems[index]?.systemType === "ROOF" && (
-                          <FormField
-                            control={form.control}
-                            name={`systems.${index}.stormResistance`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Storm Resistance (optional)</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    placeholder="e.g., Wind-rated, Hail-resistant"
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormDescription>
-                                  Important for homes in storm-prone areas
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name={`systems.${index}.installDate`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Install Date (optional)</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="date"
-                                    {...field}
-                                    value={
-                                      field.value
-                                        ? new Date(field.value)
-                                            .toISOString()
-                                            .split("T")[0]
-                                        : ""
-                                    }
-                                    onChange={(e) =>
-                                      field.onChange(
-                                        e.target.value
-                                          ? new Date(e.target.value)
-                                          : undefined
-                                      )
-                                    }
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name={`systems.${index}.expectedLifespan`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>
-                                  Expected Lifespan (years, optional)
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(
-                                        e.target.value
-                                          ? parseInt(e.target.value)
-                                          : undefined
-                                      )
-                                    }
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
                         <FormField
                           control={form.control}
-                          name={`systems.${index}.notes`}
+                          name={`systems.${index}.model`}
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Notes (optional)</FormLabel>
+                            <FormItem className="space-y-1.5">
+                              <FormLabel className="text-xs">Model</FormLabel>
                               <FormControl>
-                                <Input {...field} value={field.value || ""} />
+                                <Input
+                                  className="h-9"
+                                  {...field}
+                                  value={field.value || ""}
+                                  placeholder="Optional"
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                      {/* Condition — single row */}
+                      <FormField
+                        control={form.control}
+                        name={`systems.${index}.condition`}
+                        render={({ field }) => (
+                          <FormItem className="space-y-1.5">
+                            <FormLabel className="text-xs">Condition</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="Optional" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="excellent">Excellent</SelectItem>
+                                <SelectItem value="good">Good</SelectItem>
+                                <SelectItem value="fair">Fair</SelectItem>
+                                <SelectItem value="poor">Poor</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Optional details in accordion — keeps main view short */}
+                      <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="photo" className="border rounded-lg">
+                          <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
+                            <span className="flex items-center gap-2">
+                              <Sparkles className="h-4 w-4 text-primary" />
+                              AI Photo Analysis
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-3 pb-3 pt-0">
+                            <FormDescription className="mb-2 text-xs">
+                              Upload a photo to auto-fill brand, model, and condition.
+                            </FormDescription>
+                            <SystemPhotoUpload
+                              onAnalysisComplete={(analysis) =>
+                                handlePhotoAnalysis(index, analysis)
+                              }
+                              systemTypeHint={systems[index]?.systemType}
+                            />
+                          </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="more" className="border rounded-lg">
+                          <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
+                            More options (material, dates, notes)
+                          </AccordionTrigger>
+                          <AccordionContent className="px-3 pb-3 pt-0 space-y-3">
+                            {(systems[index]?.systemType === "PLUMBING" ||
+                              systems[index]?.systemType === "ROOF" ||
+                              systems[index]?.systemType === "ELECTRICAL") && (
+                              <FormField
+                                control={form.control}
+                                name={`systems.${index}.material`}
+                                render={({ field }) => (
+                                  <FormItem className="space-y-1.5">
+                                    <FormLabel className="text-xs">Material</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        className="h-9"
+                                        placeholder={
+                                          systems[index]?.systemType === "PLUMBING"
+                                            ? "Copper, PVC, PEX"
+                                            : systems[index]?.systemType === "ROOF"
+                                              ? "Asphalt, Metal, Tile"
+                                              : "Aluminum, Copper"
+                                        }
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                            {(systems[index]?.systemType === "ELECTRICAL" ||
+                              systems[index]?.systemType === "WATER_HEATER") && (
+                              <FormField
+                                control={form.control}
+                                name={`systems.${index}.capacity`}
+                                render={({ field }) => (
+                                  <FormItem className="space-y-1.5">
+                                    <FormLabel className="text-xs">Capacity</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        className="h-9"
+                                        placeholder={
+                                          systems[index]?.systemType === "ELECTRICAL"
+                                            ? "200A"
+                                            : "50 gal"
+                                        }
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                            {systems[index]?.systemType === "ROOF" && (
+                              <FormField
+                                control={form.control}
+                                name={`systems.${index}.stormResistance`}
+                                render={({ field }) => (
+                                  <FormItem className="space-y-1.5">
+                                    <FormLabel className="text-xs">Storm Resistance</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        className="h-9"
+                                        placeholder="e.g., Wind-rated, Hail-resistant"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                            <div className="grid grid-cols-2 gap-3">
+                              <FormField
+                                control={form.control}
+                                name={`systems.${index}.installDate`}
+                                render={({ field }) => (
+                                  <FormItem className="space-y-1.5">
+                                    <FormLabel className="text-xs">Install Date</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="date"
+                                        className="h-9"
+                                        {...field}
+                                        value={
+                                          field.value
+                                            ? new Date(field.value)
+                                                .toISOString()
+                                                .split("T")[0]
+                                            : ""
+                                        }
+                                        onChange={(e) =>
+                                          field.onChange(
+                                            e.target.value
+                                              ? new Date(e.target.value)
+                                              : undefined
+                                          )
+                                        }
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name={`systems.${index}.expectedLifespan`}
+                                render={({ field }) => (
+                                  <FormItem className="space-y-1.5">
+                                    <FormLabel className="text-xs">Lifespan (yr)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        className="h-9"
+                                        {...field}
+                                        placeholder="Optional"
+                                        onChange={(e) =>
+                                          field.onChange(
+                                            e.target.value
+                                              ? parseInt(e.target.value)
+                                              : undefined
+                                          )
+                                        }
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <FormField
+                              control={form.control}
+                              name={`systems.${index}.notes`}
+                              render={({ field }) => (
+                                <FormItem className="space-y-1.5">
+                                  <FormLabel className="text-xs">Notes</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      className="h-9"
+                                      {...field}
+                                      value={field.value || ""}
+                                      placeholder="Optional"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                  )}
                 </div>
 
-                {/* Step 3 Actions */}
-                <div className="flex gap-4">
+                {/* Sticky actions — always visible at bottom */}
+                <div className="shrink-0 flex gap-3 pt-4 border-t mt-3">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setStep(2)}
-                    className="flex-1"
+                    onClick={() => {
+                      if (isFirst) setInStep3Wizard(false);
+                      else setCurrentSystemIndex((i) => i - 1);
+                    }}
+                    className="flex-1 h-9"
                   >
-                    Back
+                    {isFirst ? "Back" : "Previous system"}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={onSubmitStep2}
+                    onClick={onSubmitStep3Systems}
                     disabled={isAddingSystems}
-                    className="flex-1"
+                    className="flex-1 h-9"
                   >
-                    Skip
+                    Skip all
                   </Button>
                   <Button
                     type="button"
-                    onClick={onSubmitStep2}
-                    disabled={isAddingSystems || (systems?.length || 0) === 0}
-                    className="flex-1"
+                    onClick={() => {
+                      if (isLast) onSubmitStep3Systems();
+                      else setCurrentSystemIndex((i) => i + 1);
+                    }}
+                    disabled={isAddingSystems || totalSystems === 0}
+                    className="flex-1 h-9"
                   >
-                    {isAddingSystems ? "Adding..." : "Add Systems & Finish"}
+                    {isAddingSystems
+                      ? "Adding..."
+                      : isLast
+                        ? "Add Systems & Finish"
+                        : "Next system"}
                   </Button>
                 </div>
               </div>
+                );
+              })()
             )}
           </Form>
         </CardContent>

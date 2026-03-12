@@ -26,6 +26,7 @@ model User {
   budgetPlans          BudgetPlan[]
   budgetAlerts          BudgetAlert[]
   pushSubscriptions    PushSubscription[]
+  vehicles             Vehicle[]
 }
 
 model Home {
@@ -112,9 +113,29 @@ model TaskTemplate {
   @@index([userId])
 }
 
+model Vehicle {
+  id             String            @id @default(cuid())
+  userId         String
+  nickname       String?
+  year           Int
+  make           String
+  model          String
+  trim           String?
+  vin            String?
+  currentMileage Int?
+  purchaseDate   DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks          MaintenanceTask[]
+
+  @@index([userId])
+}
+
 model MaintenanceTask {
   id              String            @id @default(cuid())
-  homeId          String
+  homeId          String?
+  vehicleId       String?
   templateId      String?
   name            String
   description     String
@@ -138,10 +159,12 @@ model MaintenanceTask {
   leadRequests    LeadRequest[]
   dependsOn       MaintenanceTask?  @relation("TaskDependencies", fields: [dependsOnTaskId], references: [id])
   dependentTasks  MaintenanceTask[] @relation("TaskDependencies")
-  home            Home              @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  home            Home?             @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   template        TaskTemplate?     @relation(fields: [templateId], references: [id])
 
   @@index([homeId])
+  @@index([vehicleId])
   @@index([nextDueDate])
   @@index([completed])
   @@index([dependsOnTaskId])
@@ -616,6 +639,7 @@ enum TaskCategory {
   APPLIANCE
   SAFETY
   ELECTRICAL
+  VEHICLE
   OTHER
 }
 

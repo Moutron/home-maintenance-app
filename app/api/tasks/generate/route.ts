@@ -3,6 +3,10 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateComplianceTasks, type ComplianceTask } from "@/lib/utils/compliance-tasks";
+import {
+  buildClimateDataFromHome,
+  getClimateRecommendations,
+} from "@/lib/utils/climate-data";
 
 // Helper function to get or create user from Clerk
 async function getOrCreateUser(clerkId: string, email: string) {
@@ -502,10 +506,27 @@ export async function POST(request: NextRequest) {
       }));
     console.log(`[33] Converted ${complianceTasksForDb.length} compliance tasks for database`);
 
+    console.log("[33.5] Generating climate recommendation tasks...");
+    const climateData = buildClimateDataFromHome(home);
+    const climateRecommendations = getClimateRecommendations(climateData);
+    const climateTasksForDb = climateRecommendations.map((rec) => {
+      const name = rec.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\s]+/u, "").trim().slice(0, 80) || "Climate recommendation";
+      return {
+        homeId: home.id,
+        name: name.length > 0 ? name : "Climate-based maintenance",
+        description: rec,
+        category: "OTHER" as const,
+        frequency: "ANNUAL" as const,
+        nextDueDate: calculateNextDueDate("ANNUAL"),
+        priority: "medium",
+        notes: "Based on your home's climate and storm risk.",
+      };
+    });
+    console.log(`[33.6] Climate recommendation tasks: ${climateTasksForDb.length}`);
+
     console.log("[34] Combining all tasks...");
-    // Combine regular tasks and compliance tasks
-    const allTasks = [...personalizedTasks, ...complianceTasksForDb];
-    console.log(`[35] Total tasks to create: ${allTasks.length} (${personalizedTasks.length} regular + ${complianceTasksForDb.length} compliance)`);
+    const allTasks = [...personalizedTasks, ...complianceTasksForDb, ...climateTasksForDb];
+    console.log(`[35] Total tasks to create: ${allTasks.length} (${personalizedTasks.length} regular + ${complianceTasksForDb.length} compliance + ${climateTasksForDb.length} climate)`);
 
     // Validate we have tasks to create
     if (allTasks.length === 0) {
@@ -584,9 +605,10 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(
       {
-        message: `Generated ${createdTasks.length} tasks (${personalizedTasks.length} regular + ${complianceTasks.length} compliance)`,
+        message: `Generated ${createdTasks.length} tasks (${personalizedTasks.length} regular + ${complianceTasks.length} compliance + ${climateTasksForDb.length} climate)`,
         tasks: createdTasks,
         complianceTasksCount: complianceTasks.length,
+        climateTasksCount: climateTasksForDb.length,
       },
       { status: 201 }
     );

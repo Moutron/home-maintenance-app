@@ -20,6 +20,40 @@ async function getOrCreateUser(clerkId: string, email: string) {
   return user;
 }
 
+export async function DELETE(
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: homeId } = await context.params;
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const clerkUser = await currentUser();
+    if (!clerkUser?.emailAddresses?.[0]?.emailAddress) {
+      return NextResponse.json({ error: "User email not found" }, { status: 400 });
+    }
+    const user = await getOrCreateUser(clerkId, clerkUser.emailAddresses[0].emailAddress);
+
+    const home = await prisma.home.findFirst({
+      where: { id: homeId, userId: user.id },
+    });
+    if (!home) {
+      return NextResponse.json({ error: "Home not found" }, { status: 404 });
+    }
+
+    await prisma.home.delete({ where: { id: homeId } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting home:", error);
+    return NextResponse.json(
+      { error: "Failed to delete home" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }

@@ -35,18 +35,23 @@ export async function POST(request: NextRequest) {
       if (type === "task_reminder" && taskId) {
         const task = await prisma.maintenanceTask.findUnique({
           where: { id: taskId },
-          include: { home: true },
+          include: { home: true, vehicle: true },
         });
         
         if (task) {
           const daysUntilDue = Math.ceil(
             (new Date(task.nextDueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
           );
+          const locationLabel = task.home
+            ? `${task.home.address}, ${task.home.city}`
+            : task.vehicle
+              ? task.vehicle.nickname || `${task.vehicle.year} ${task.vehicle.make} ${task.vehicle.model}`
+              : "Task";
           notification = createTaskReminderPush(
             task.name,
             daysUntilDue,
             task.id,
-            `${task.home.address}, ${task.home.city}`
+            locationLabel
           );
         }
       } else if (type === "warranty_expiration" && warrantyId) {

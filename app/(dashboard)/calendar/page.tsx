@@ -29,11 +29,18 @@ type Task = {
   category: string;
   nextDueDate: string;
   completed: boolean;
-  home: {
+  home?: {
     address: string;
     city: string;
     state: string;
-  };
+  } | null;
+  vehicle?: {
+    id: string;
+    nickname: string | null;
+    year: number;
+    make: string;
+    model: string;
+  } | null;
 };
 
 export default function CalendarPage() {
@@ -86,9 +93,16 @@ export default function CalendarPage() {
       APPLIANCE: "bg-purple-100 text-purple-800",
       SAFETY: "bg-orange-100 text-orange-800",
       ELECTRICAL: "bg-indigo-100 text-indigo-800",
+      VEHICLE: "bg-slate-100 text-slate-800",
       OTHER: "bg-gray-100 text-gray-800",
     };
     return colors[category] || colors.OTHER;
+  };
+
+  const taskSourceLabel = (task: Task) => {
+    if (task.vehicle) return `Vehicle: ${task.vehicle.nickname || `${task.vehicle.year} ${task.vehicle.make} ${task.vehicle.model}`}`;
+    if (task.home) return `${task.home.address}, ${task.home.city}`;
+    return "—";
   };
 
   const navigateMonth = (direction: "prev" | "next") => {
@@ -217,7 +231,7 @@ export default function CalendarPage() {
                                 {task.description}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                {task.home.address}, {task.home.city}
+                                {taskSourceLabel(task)}
                               </p>
                             </div>
                           </div>
@@ -246,9 +260,10 @@ export default function CalendarPage() {
                               </p>
                             </div>
                             <div>
-                              <span className="font-semibold">Home:</span>
+                              <span className="font-semibold">Source:</span>
                               <p className="text-sm mt-1">
-                                {task.home.address}, {task.home.city}, {task.home.state}
+                                {taskSourceLabel(task)}
+                                {task.home && `, ${task.home.state}`}
                               </p>
                             </div>
                           </div>
@@ -297,7 +312,7 @@ export default function CalendarPage() {
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {task.home.address}
+                        {taskSourceLabel(task)}
                       </p>
                     </div>
                     <div className="text-sm font-medium">

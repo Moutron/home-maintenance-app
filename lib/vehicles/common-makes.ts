@@ -1,0 +1,38 @@
+/**
+ * Curated common makes (matches NHTSA vPIC naming for models API).
+ * Used by /api/vehicles/makes and garage UI so makes show even if fetch fails.
+ */
+export const COMMON_VEHICLE_MAKES = [
+  "Acura",
+  "Alfa Romeo",
+  "Audi",
+  "BMW",
+  "Buick",
+  "Cadillac",
+  "Chevrolet",
+  "Chrysler",
+  "Dodge",
+  "Ford",
+  "Genesis",
+  "GMC",
+  "Honda",
+  "Hyundai",
+  "Infiniti",
+  "Jaguar",
+  "Jeep",
+  "Kia",
+  "Land Rover",
+  "Lexus",
+  "Lincoln",
+  "Mazda",
+  "Mercedes-Benz",
+  "MINI",
+  "Mitsubishi",
+  "Nissan",
+  "Porsche",
+  "Ram",
+  "Subaru",
+  "Toyota",
+  "Volkswagen",
+  "Volvo",
+] as const;

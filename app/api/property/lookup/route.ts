@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       bedrooms: enrichedData?.bedrooms,
     });
     
-    // If we got good data from enrichment, use it
+    // If we got good data from enrichment, use it (enrichment returns system-related fields: heatingType, coolingType, roofType, etc.)
     if (enrichedData && (enrichedData.yearBuilt || enrichedData.squareFootage || enrichedData.bedrooms)) {
       console.log("Using enriched data from:", enrichedData.sources);
       const mappedData = mapToHomeSchema(enrichedData);
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
           bedrooms: enrichedData.bedrooms,
           bathrooms: enrichedData.bathrooms,
           propertyType: enrichedData.propertyType,
-          // Additional enriched data
+          // System-related fields (used to auto-fill onboarding step 3 when present)
           stories: enrichedData.stories,
           garageSpaces: enrichedData.garageSpaces,
           assessedValue: enrichedData.assessedValue,
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         { 
           found: false,
           requiresApiKey: true,
-          message: "Property lookup APIs are not configured. Please enter property details manually.\n\nTo enable automatic lookup:\n- Add RENTCAST_API_KEY for comprehensive property data (recommended)\n- Add RAPIDAPI_KEY for Zillow/Redfin data\n- Set ENABLE_WEB_SCRAPING=true for web scraping (use at own risk)\n\nSee PROPERTY_ENRICHMENT_GUIDE.md for setup instructions." 
+          message: "Property lookup APIs are not configured. Please enter property details manually.\n\nTo enable automatic lookup:\n- Add RENTCAST_API_KEY for comprehensive property data (recommended)\n- Add RAPIDAPI_KEY for Zillow/Redfin data (Vercel: Settings → Environment Variables, then redeploy)\n- Set ENABLE_WEB_SCRAPING=true for web scraping (use at own risk)\n\nSee PROPERTY_ENRICHMENT_GUIDE.md for setup instructions." 
         },
         { status: 200 }
       );

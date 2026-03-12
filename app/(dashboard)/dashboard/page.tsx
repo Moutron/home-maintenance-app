@@ -93,8 +93,15 @@ const COLORS = {
   APPLIANCE: "#f97316",
   SAFETY: "#ef4444",
   ELECTRICAL: "#6366f1",
+  VEHICLE: "#64748b",
   OTHER: "#6b7280",
 };
+
+function taskSourceLabel(task: { home?: { address: string; city: string } | null; vehicle?: { nickname: string | null; year: number; make: string; model: string } | null }) {
+  if (task.vehicle) return `Vehicle: ${task.vehicle.nickname || `${task.vehicle.year} ${task.vehicle.make} ${task.vehicle.model}`}`;
+  if (task.home) return `${task.home.address}, ${task.home.city}`;
+  return "—";
+}
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -130,6 +137,7 @@ export default function DashboardPage() {
       APPLIANCE: "bg-orange-100 text-orange-800",
       SAFETY: "bg-red-100 text-red-800",
       ELECTRICAL: "bg-indigo-100 text-indigo-800",
+      VEHICLE: "bg-slate-100 text-slate-800",
       OTHER: "bg-gray-100 text-gray-800",
     };
     return colors[category] || colors.OTHER;
@@ -479,7 +487,7 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {task.home.address}, {task.home.city}
+                        {taskSourceLabel(task)}
                       </p>
                       <p className="text-xs text-red-600 font-medium mt-1">
                         Due: {format(new Date(task.dueDate), "MMM d, yyyy")}
@@ -542,7 +550,7 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {task.home.address}, {task.home.city}
+                        {taskSourceLabel(task)}
                       </p>
                     </div>
                   </div>
@@ -729,7 +737,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {task.home.address}, {task.home.city}
+                      {taskSourceLabel(task)}
                     </p>
                     <div className="flex items-center gap-1 mt-1">
                       <Clock className="h-3 w-3 text-muted-foreground" />

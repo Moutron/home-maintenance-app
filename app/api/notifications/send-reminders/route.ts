@@ -50,40 +50,37 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { daysAhead = [30, 14, 7] } = body; // Default: 30, 14, and 7 days ahead
 
-    // Get user's homes
-    const homes = await prisma.home.findMany({
-      where: { userId: user.id },
-      select: { id: true },
-    });
-
+    const [homes, vehicles] = await Promise.all([
+      prisma.home.findMany({ where: { userId: user.id }, select: { id: true } }),
+      prisma.vehicle.findMany({ where: { userId: user.id }, select: { id: true } }),
+    ]);
     const homeIds = homes.map((h: { id: string }) => h.id);
+    const vehicleIds = vehicles.map((v: { id: string }) => v.id);
 
-    if (homeIds.length === 0) {
-      return NextResponse.json({ sent: 0, message: "No homes found" });
+    if (homeIds.length === 0 && vehicleIds.length === 0) {
+      return NextResponse.json({ sent: 0, message: "No homes or vehicles found" });
     }
 
-    // Find tasks due within the specified days
     const now = new Date();
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + Math.max(...daysAhead));
 
+    const taskOwnerCondition =
+      homeIds.length > 0 && vehicleIds.length > 0
+        ? { OR: [{ homeId: { in: homeIds } }, { vehicleId: { in: vehicleIds } }] }
+        : homeIds.length > 0
+          ? { homeId: { in: homeIds } }
+          : { vehicleId: { in: vehicleIds } };
+
     const tasks = await prisma.maintenanceTask.findMany({
       where: {
-        homeId: { in: homeIds },
+        ...taskOwnerCondition,
         completed: false,
-        nextDueDate: {
-          gte: now,
-          lte: maxDate,
-        },
+        nextDueDate: { gte: now, lte: maxDate },
       },
       include: {
-        home: {
-          select: {
-            address: true,
-            city: true,
-            state: true,
-          },
-        },
+        home: { select: { address: true, city: true, state: true } },
+        vehicle: { select: { nickname: true, year: true, make: true, model: true } },
       },
     });
 
@@ -104,15 +101,22 @@ export async function POST(request: NextRequest) {
     for (const days of daysAhead) {
       const tasksForDay = tasksByDays[days] || [];
       if (tasksForDay.length > 0) {
-        const reminderData = tasksForDay.map((task: (typeof tasks)[number]) => ({
-          taskName: task.name,
-          taskDescription: task.description,
-          dueDate: task.nextDueDate.toISOString(),
-          homeAddress: `${task.home.address}, ${task.home.city}, ${task.home.state}`,
-          category: task.category,
-          priority: task.priority || undefined,
-          daysUntilDue: days,
-        }));
+        const reminderData = tasksForDay.map((task: (typeof tasks)[number]) => {
+          const locationLabel = task.home
+            ? `${task.home.address}, ${task.home.city}, ${task.home.state}`
+            : task.vehicle
+              ? task.vehicle.nickname || `${task.vehicle.year} ${task.vehicle.make} ${task.vehicle.model}`
+              : "";
+          return {
+            taskName: task.name,
+            taskDescription: task.description,
+            dueDate: task.nextDueDate.toISOString(),
+            homeAddress: locationLabel,
+            category: task.category,
+            priority: task.priority || undefined,
+            daysUntilDue: days,
+          };
+        });
 
         try {
           // Send email

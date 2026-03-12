@@ -10,7 +10,7 @@ export function MobileBottomNav() {
 
   // Pick a subset of primary items for the bottom bar
   const primaryItems = navigation.filter((item) =>
-    ["/dashboard", "/homes", "/tasks", "/budget", "/settings"].includes(item.href)
+    ["/dashboard", "/homes", "/garage", "/tasks", "/budget", "/settings"].includes(item.href)
   );
 
   return (

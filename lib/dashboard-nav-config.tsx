@@ -10,11 +10,13 @@ import {
   Shield,
   Hammer,
   Wrench,
+  Car,
 } from "lucide-react";
 
 export const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Homes", href: "/homes", icon: Home },
+  { name: "My Garage", href: "/garage", icon: Car },
   { name: "Tasks", href: "/tasks", icon: ListTodo },
   { name: "DIY Projects", href: "/diy-projects", icon: Hammer },
   { name: "Tool Inventory", href: "/tools", icon: Wrench },

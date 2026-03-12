@@ -344,6 +344,127 @@ async function main() {
       importance: "low",
       season: "spring",
     },
+
+    // Vehicle maintenance tasks
+    {
+      name: "Oil and Filter Change",
+      description: "Replace engine oil and oil filter to protect the engine and maintain longevity.",
+      category: "VEHICLE",
+      baseFrequency: "QUARTERLY",
+      educationalContent: {
+        whyImportant:
+          "Fresh oil lubricates engine parts and removes contaminants. Skipping changes can lead to wear and costly repairs.",
+        diyGuidance:
+          "Warm engine, drain oil, replace filter, add new oil to spec. Dispose of used oil at a recycling center.",
+      },
+      diyDifficulty: "medium",
+      costRangeMin: 30,
+      costRangeMax: 80,
+      importance: "high",
+      season: "all",
+    },
+    {
+      name: "Tire Rotation",
+      description: "Rotate tires to promote even wear and extend tire life.",
+      category: "VEHICLE",
+      baseFrequency: "BIANNUAL",
+      educationalContent: {
+        whyImportant:
+          "Even wear improves handling, fuel economy, and tire lifespan.",
+        diyGuidance:
+          "Follow your manual's rotation pattern. Use jack stands, loosen lug nuts before lifting, then swap positions.",
+      },
+      diyDifficulty: "medium",
+      costRangeMin: 0,
+      costRangeMax: 50,
+      importance: "medium",
+      season: "all",
+    },
+    {
+      name: "Brake Fluid Check / Replace",
+      description: "Inspect brake fluid level and condition; replace per manufacturer interval.",
+      category: "VEHICLE",
+      baseFrequency: "ANNUAL",
+      educationalContent: {
+        whyImportant:
+          "Brake fluid absorbs moisture over time; old fluid can reduce braking performance and damage components.",
+        diyGuidance:
+          "Check reservoir level and color. Flush and refill with DOT-spec fluid; bleed brakes if replacing.",
+      },
+      diyDifficulty: "medium",
+      costRangeMin: 50,
+      costRangeMax: 150,
+      importance: "high",
+      season: "all",
+    },
+    {
+      name: "Cabin Air Filter Replacement",
+      description: "Replace the cabin air filter for clean HVAC airflow and comfort.",
+      category: "VEHICLE",
+      baseFrequency: "ANNUAL",
+      educationalContent: {
+        whyImportant:
+          "A clogged filter reduces HVAC effectiveness and can worsen cabin air quality.",
+        diyGuidance:
+          "Locate filter (often behind glove box or under dash), remove old filter, install new one with airflow arrow correct.",
+      },
+      diyDifficulty: "easy",
+      costRangeMin: 15,
+      costRangeMax: 40,
+      importance: "low",
+      season: "all",
+    },
+    {
+      name: "Engine Air Filter Replacement",
+      description: "Replace the engine air filter for optimal airflow and fuel economy.",
+      category: "VEHICLE",
+      baseFrequency: "ANNUAL",
+      educationalContent: {
+        whyImportant:
+          "A dirty filter restricts airflow and can reduce power and fuel efficiency.",
+        diyGuidance:
+          "Open airbox, remove old filter, wipe housing, install new filter and secure the lid.",
+      },
+      diyDifficulty: "easy",
+      costRangeMin: 20,
+      costRangeMax: 50,
+      importance: "medium",
+      season: "all",
+    },
+    {
+      name: "Battery Check",
+      description: "Test battery voltage and connections; clean terminals if needed.",
+      category: "VEHICLE",
+      baseFrequency: "ANNUAL",
+      educationalContent: {
+        whyImportant:
+          "Weak batteries cause no-starts and strain the charging system.",
+        diyGuidance:
+          "Check voltage with a multimeter (resting ~12.6V). Clean terminals with baking soda and water; apply anti-corrosion grease.",
+      },
+      diyDifficulty: "easy",
+      costRangeMin: 0,
+      costRangeMax: 0,
+      importance: "medium",
+      season: "fall",
+    },
+    {
+      name: "Coolant Flush / Refill",
+      description: "Drain and refill coolant per manufacturer schedule to protect the engine.",
+      category: "VEHICLE",
+      baseFrequency: "BIANNUAL",
+      educationalContent: {
+        whyImportant:
+          "Old coolant loses corrosion inhibitors and can lead to overheating and engine damage.",
+        diyGuidance:
+          "When engine is cool, drain radiator and block if applicable, refill with correct coolant mix, bleed air from system.",
+      },
+      diyDifficulty: "medium",
+      costRangeMin: 50,
+      costRangeMax: 150,
+      importance: "high",
+      season: "all",
+    },
   ];
 
   for (const template of taskTemplates) {

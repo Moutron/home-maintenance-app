@@ -305,6 +305,41 @@ export async function fetchHistoricalStormData(
 }
 
 /**
+ * Build ClimateData from home record for use in task generation.
+ * Uses home's stored values when present, otherwise estimates from state.
+ */
+export function buildClimateDataFromHome(home: {
+  state: string;
+  city?: string | null;
+  zipCode?: string | null;
+  stormFrequency?: string | null;
+  averageRainfall?: number | null;
+  averageSnowfall?: number | null;
+}): ClimateData {
+  const stateUpper = home.state.trim().toUpperCase();
+  const hurricaneRisk = ["FL", "LA", "TX", "NC", "SC", "GA", "AL", "MS"].includes(stateUpper);
+  const tornadoRisk = [
+    "TX", "OK", "KS", "NE", "IA", "MO", "AR", "MS", "AL", "TN", "KY", "IL", "IN", "OH",
+  ].includes(stateUpper);
+  const stormFrequency =
+    home.stormFrequency === "low" ||
+    home.stormFrequency === "moderate" ||
+    home.stormFrequency === "high" ||
+    home.stormFrequency === "severe"
+      ? home.stormFrequency
+      : estimateStormFrequency(home.state, home.city ?? undefined);
+  return {
+    stormFrequency,
+    averageRainfall: home.averageRainfall ?? 30,
+    averageSnowfall: home.averageSnowfall ?? 10,
+    hurricaneRisk,
+    tornadoRisk,
+    hailRisk: false,
+    source: "home",
+  };
+}
+
+/**
  * Get climate recommendations based on fetched data
  */
 export function getClimateRecommendations(data: ClimateData): string[] {

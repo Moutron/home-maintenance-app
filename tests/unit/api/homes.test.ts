@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { NextRequest } from "next/server";
 import { GET, POST } from "@/app/api/homes/route";
-import { GET as GET_HOME } from "@/app/api/homes/[id]/route";
+import { GET as GET_HOME, DELETE as DELETE_HOME } from "@/app/api/homes/[id]/route";
 import { mockClerkAuth, testData, createMockPrisma } from "../../utils/test-helpers";
 import { auth, currentUser } from "@clerk/nextjs/server";
 
@@ -365,6 +365,66 @@ describe("Homes API", () => {
 
       expect(response.status).toBe(500);
       expect(data.error).toBe("Failed to fetch home");
+    });
+  });
+
+  describe("DELETE /api/homes/[id]", () => {
+    it("should delete home when user owns it", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ 
+        id: testData.user.id, 
+        clerkId: testData.user.clerkId, 
+        email: testData.user.email 
+      });
+      mockPrisma.user.create.mockResolvedValue(testData.user);
+      mockPrisma.home.findFirst.mockResolvedValue(testData.home);
+      mockPrisma.home.delete.mockResolvedValue(testData.home);
+
+      const request = new NextRequest(`http://localhost:3000/api/homes/${testData.home.id}`, {
+        method: "DELETE",
+      });
+      const params = Promise.resolve({ id: testData.home.id });
+      const response = await DELETE_HOME(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(mockPrisma.home.delete).toHaveBeenCalledWith({
+        where: { id: testData.home.id },
+      });
+    });
+
+    it("should return 401 when not authenticated", async () => {
+      vi.mocked(auth).mockResolvedValue({ userId: null } as any);
+
+      const request = new NextRequest(`http://localhost:3000/api/homes/${testData.home.id}`, {
+        method: "DELETE",
+      });
+      const params = Promise.resolve({ id: testData.home.id });
+      const response = await DELETE_HOME(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Unauthorized");
+    });
+
+    it("should return 404 when home not found", async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ 
+        id: testData.user.id, 
+        clerkId: testData.user.clerkId, 
+        email: testData.user.email 
+      });
+      mockPrisma.user.create.mockResolvedValue(testData.user);
+      mockPrisma.home.findFirst.mockResolvedValue(null);
+
+      const request = new NextRequest("http://localhost:3000/api/homes/nonexistent", {
+        method: "DELETE",
+      });
+      const params = Promise.resolve({ id: "nonexistent" });
+      const response = await DELETE_HOME(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(data.error).toBe("Home not found");
     });
   });
 });

@@ -183,6 +183,65 @@ Return your response as a JSON array of tasks, where each task has this structur
 Generate a comprehensive list covering all maintenance needs for the next 12 months.`;
 }
 
+export interface VehicleMaintenanceData {
+  year: number;
+  make: string;
+  model: string;
+  currentMileage: number | null;
+  purchaseDate: string | null;
+}
+
+/**
+ * Builds a detailed prompt for AI to generate vehicle maintenance tasks
+ * based on the owner's manual for the given year/make/model.
+ */
+export function buildVehicleMaintenancePrompt(data: VehicleMaintenanceData): string {
+  const currentYear = new Date().getFullYear();
+  const vehicleAge = data.year ? currentYear - data.year : null;
+
+  return `You are an expert automotive maintenance advisor with access to typical owner's manual schedules for passenger vehicles. Your task is to generate a full year of maintenance tasks for the following vehicle, using the same kind of schedule found in the manufacturer's owner's manual (e.g., service at X miles or Y months, whichever comes first).
+
+VEHICLE:
+- Year: ${data.year}
+- Make: ${data.make}
+- Model: ${data.model}
+- Current mileage: ${data.currentMileage != null ? `${data.currentMileage.toLocaleString()} miles` : "Unknown"}
+- Purchase date: ${data.purchaseDate || "Unknown"}
+${vehicleAge != null ? `- Vehicle age: ${vehicleAge} years` : ""}
+
+INSTRUCTIONS:
+1. Base tasks on the typical maintenance schedule for this exact year/make/model as found in the owner's manual (oil and filter changes, tire rotation, brake fluid, cabin filter, engine air filter, coolant, spark plugs, transmission fluid, etc.).
+2. Use both mileage-based and time-based intervals where the manual typically does (e.g., "every 7,500 miles or 12 months").
+3. For each task provide:
+   - name: Short, actionable title (e.g., "Oil and filter change")
+   - description: What to do and why, including manual-style interval (e.g., "Replace engine oil and filter. Per manual: every 7,500 mi or 12 months.")
+   - category: Always "VEHICLE"
+   - frequency: One of WEEKLY, MONTHLY, QUARTERLY, BIANNUAL, ANNUAL, SEASONAL, AS_NEEDED (choose the best match for the interval)
+   - priority: "low" | "medium" | "high" | "critical"
+   - costEstimateMin and costEstimateMax: USD range for the service (DIY or shop)
+   - explanation: Why this is in the manual and why it matters for this vehicle
+   - intervalMiles: optional, number (e.g., 7500 for oil change)
+   - intervalMonths: optional, number (e.g., 12)
+4. Schedule tasks for the next 12 months from today. If current mileage is provided, suggest next due dates that align with mileage milestones where relevant.
+5. Include safety-related items (brakes, tires, fluids) and wear items (filters, wipers, battery check) as appropriate for this vehicle's age and mileage.
+
+Return ONLY a valid JSON array of tasks. Each task must have:
+{
+  "name": "string",
+  "description": "string",
+  "category": "VEHICLE",
+  "frequency": "WEEKLY|MONTHLY|QUARTERLY|BIANNUAL|ANNUAL|SEASONAL|AS_NEEDED",
+  "priority": "low|medium|high|critical",
+  "costEstimateMin": number,
+  "costEstimateMax": number,
+  "explanation": "string",
+  "intervalMiles": number or null,
+  "intervalMonths": number or null
+}
+
+Generate a comprehensive list covering all maintenance for the next 12 months as would appear in the owner's manual for a ${data.year} ${data.make} ${data.model}.`;
+}
+
 export function buildTaskExplanationPrompt(
   taskName: string,
   homeData: HomeInventoryData,

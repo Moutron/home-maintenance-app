@@ -85,15 +85,14 @@ export async function GET(request: NextRequest) {
     const startOfCurrentYear = startOfYear(now);
     const endOfCurrentYear = endOfYear(now);
 
-    // Get user's homes
-    const homes = await prisma.home.findMany({
-      where: { userId: user.id },
-      select: { id: true },
-    });
-
+    const [homes, vehicles] = await Promise.all([
+      prisma.home.findMany({ where: { userId: user.id }, select: { id: true } }),
+      prisma.vehicle.findMany({ where: { userId: user.id }, select: { id: true } }),
+    ]);
     const homeIds = homes.map((h: { id: string }) => h.id);
+    const vehicleIds = vehicles.map((v: { id: string }) => v.id);
 
-    if (homeIds.length === 0) {
+    if (homeIds.length === 0 && vehicleIds.length === 0) {
       return NextResponse.json({
         stats: {
           upcomingTasks: 0,
@@ -130,13 +129,18 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch all tasks
+    const taskOwnerCondition =
+      homeIds.length > 0 && vehicleIds.length > 0
+        ? { OR: [{ homeId: { in: homeIds } }, { vehicleId: { in: vehicleIds } }] }
+        : homeIds.length > 0
+          ? { homeId: { in: homeIds } }
+          : { vehicleId: { in: vehicleIds } };
+
     const allTasks = await prisma.maintenanceTask.findMany({
       where: {
-        homeId: { in: homeIds },
-        OR: [
-          { snoozedUntil: null },
-          { snoozedUntil: { lt: now } },
+        ...taskOwnerCondition,
+        AND: [
+          { OR: [{ snoozedUntil: null }, { snoozedUntil: { lt: now } }] },
         ],
       },
       include: {
@@ -145,6 +149,15 @@ export async function GET(request: NextRequest) {
             id: true,
             address: true,
             city: true,
+          },
+        },
+        vehicle: {
+          select: {
+            id: true,
+            nickname: true,
+            year: true,
+            make: true,
+            model: true,
           },
         },
       },
@@ -534,6 +547,7 @@ export async function GET(request: NextRequest) {
           dueDate: task.nextDueDate,
           priority: task.priority,
           home: task.home,
+          vehicle: task.vehicle,
         })),
         tasksDueToday: tasksDueToday.slice(0, 10).map((task: (typeof tasksDueToday)[number]) => ({
           id: task.id,
@@ -541,6 +555,7 @@ export async function GET(request: NextRequest) {
           category: task.category,
           priority: task.priority,
           home: task.home,
+          vehicle: task.vehicle,
         })),
         warrantiesExpiring30,
         warrantiesExpiring60,
@@ -556,6 +571,7 @@ export async function GET(request: NextRequest) {
           nextDueDate: task.nextDueDate,
           priority: task.priority,
           home: task.home,
+          vehicle: task.vehicle,
         })),
         overdue: overdueTasks.slice(0, 10).map((task: (typeof overdueTasks)[number]) => ({
           id: task.id,
@@ -565,6 +581,7 @@ export async function GET(request: NextRequest) {
           nextDueDate: task.nextDueDate,
           priority: task.priority,
           home: task.home,
+          vehicle: task.vehicle,
         })),
         dueToday: tasksDueToday.slice(0, 10).map((task: (typeof tasksDueToday)[number]) => ({
           id: task.id,
@@ -573,6 +590,7 @@ export async function GET(request: NextRequest) {
           category: task.category,
           priority: task.priority,
           home: task.home,
+          vehicle: task.vehicle,
         })),
       },
       spending: {
