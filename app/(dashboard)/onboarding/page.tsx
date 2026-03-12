@@ -138,9 +138,18 @@ export default function OnboardingPage() {
 
   const canLookup = address && city && state && zipCode && zipCode.length >= 5;
 
-  // Step 1: Advance to Weather & Climate (no API yet)
-  const onSubmitStep1 = (data: CreateHomeInput) => {
-    setStep(2);
+  // Step 1: Save home so progress isn't lost after login, then advance to Weather & Climate
+  const onSubmitStep1 = async (data: CreateHomeInput) => {
+    setIsSubmitting(true);
+    try {
+      await createHomeWithClimate(data);
+      setStep(2);
+    } catch (error) {
+      console.error("Error saving home:", error);
+      alert(error instanceof Error ? error.message : "Failed to save home");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Normalize and create home (used after Step 2 - Weather & Climate)
@@ -892,8 +901,8 @@ export default function OnboardingPage() {
               </div>
 
               <div className="shrink-0 pt-4 border-t mt-3">
-                <Button type="submit" className="w-full h-9">
-                  Continue to Weather & Climate
+                <Button type="submit" className="w-full h-9" disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : "Continue to Weather & Climate"}
                 </Button>
               </div>
             </form>
