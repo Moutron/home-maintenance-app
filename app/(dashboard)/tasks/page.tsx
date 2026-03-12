@@ -17,9 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Circle, Calendar, Home, Wrench, BookOpen } from "lucide-react";
-import { ComplianceBadge } from "@/components/compliance-badge";
+import { CheckCircle2, Circle, Calendar, Home, Car, Wrench, BookOpen } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ type Task = {
   completed: boolean;
   costEstimate: number | null;
   notes: string | null;
-  home: {
+  home?: {
     id: string;
     address: string;
     city: string;
@@ -49,7 +50,14 @@ type Task = {
     yearBuilt: number;
     homeType: string;
     systems?: { id: string; systemType: string; brand: string | null; model: string | null }[];
-  };
+  } | null;
+  vehicle?: {
+    id: string;
+    nickname: string | null;
+    year: number;
+    make: string;
+    model: string;
+  } | null;
   template: {
     id: string;
     name: string;
@@ -62,8 +70,11 @@ type Task = {
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [homes, setHomes] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<{ id: string; nickname: string | null; year: number; make: string; model: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterSource, setFilterSource] = useState<"all" | "home" | "vehicle">("all");
   const [filterHomeId, setFilterHomeId] = useState<string>("all");
+  const [filterVehicleId, setFilterVehicleId] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterCompleted, setFilterCompleted] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"dueDate" | "category" | "name">("dueDate");
@@ -74,8 +85,12 @@ export default function TasksPage() {
 
   useEffect(() => {
     fetchTasks();
+  }, [filterSource, filterHomeId, filterVehicleId, filterCategory, filterCompleted]);
+
+  useEffect(() => {
     fetchHomes();
-  }, [filterHomeId, filterCategory, filterCompleted]);
+    fetchVehicles();
+  }, []);
 
   const fetchHomes = async () => {
     try {
@@ -86,6 +101,18 @@ export default function TasksPage() {
       }
     } catch (error) {
       console.error("Error fetching homes:", error);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    try {
+      const response = await fetch("/api/vehicles");
+      if (response.ok) {
+        const data = await response.json();
+        setVehicles(data.vehicles || []);
+      }
+    } catch (error) {
+      console.error("Error fetching vehicles:", error);
     }
   };
 
@@ -126,8 +153,19 @@ export default function TasksPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filterHomeId !== "all") {
-        params.append("homeId", filterHomeId);
+      if (filterSource === "home") {
+        if (filterHomeId !== "all") {
+          params.append("homeId", filterHomeId);
+        } else {
+          params.append("source", "home");
+        }
+      }
+      if (filterSource === "vehicle") {
+        if (filterVehicleId !== "all") {
+          params.append("vehicleId", filterVehicleId);
+        } else {
+          params.append("source", "vehicle");
+        }
       }
       if (filterCategory !== "all") {
         params.append("category", filterCategory);
@@ -178,6 +216,7 @@ export default function TasksPage() {
     "APPLIANCE",
     "SAFETY",
     "ELECTRICAL",
+    "VEHICLE",
     "OTHER",
   ];
 
@@ -191,9 +230,21 @@ export default function TasksPage() {
       APPLIANCE: "bg-purple-100 text-purple-800",
       SAFETY: "bg-orange-100 text-orange-800",
       ELECTRICAL: "bg-indigo-100 text-indigo-800",
+      VEHICLE: "bg-slate-100 text-slate-800",
       OTHER: "bg-gray-100 text-gray-800",
     };
     return colors[category] || colors.OTHER;
+  };
+
+  const taskSourceLabel = (task: Task) => {
+    if (task.vehicle) {
+      const v = task.vehicle;
+      return v.nickname || `${v.year} ${v.make} ${v.model}`;
+    }
+    if (task.home) {
+      return `${task.home.address}, ${task.home.city}, ${task.home.state}`;
+    }
+    return "—";
   };
 
   const isOverdue = (dueDate: string, completed: boolean) => {
@@ -210,6 +261,7 @@ export default function TasksPage() {
   };
 
   const homeHasRelevantSystemWithDetails = (task: Task) => {
+    if (!task.home) return false;
     const systemType = categoryToSystemType[task.category];
     if (!systemType || !task.home.systems?.length) return false;
     const match = task.home.systems.find(
@@ -247,61 +299,117 @@ export default function TasksPage() {
       <div>
         <h1 className="text-3xl font-bold">Maintenance Tasks</h1>
         <p className="text-muted-foreground">
-          Manage and track your home maintenance tasks
+          Manage and track home and vehicle maintenance tasks
         </p>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <Select value={filterHomeId} onValueChange={setFilterHomeId}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="All Homes" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Homes</SelectItem>
-            {homes.map((home) => (
-              <SelectItem key={home.id} value={home.id}>
-                {home.address}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Filters — narrow the list by source, home/vehicle, category, and status */}
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">
+          Use the filters below to show only the tasks you want. Changing any filter reloads the task list.
+        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="space-y-1.5">
+            <Label htmlFor="filter-source">Source</Label>
+            <Select
+              value={filterSource}
+              onValueChange={(v) => setFilterSource(v as "all" | "home" | "vehicle")}
+            >
+              <SelectTrigger id="filter-source" className="w-full sm:w-[160px]">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All (homes & vehicles)</SelectItem>
+                <SelectItem value="home">Home only</SelectItem>
+                <SelectItem value="vehicle">Vehicle only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {filterSource === "home" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="filter-home">Home</Label>
+              <Select value={filterHomeId} onValueChange={setFilterHomeId}>
+                <SelectTrigger id="filter-home" className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="All Homes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Homes</SelectItem>
+                  {homes.map((home) => (
+                    <SelectItem key={home.id} value={home.id}>
+                      {home.address}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {filterSource === "vehicle" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="filter-vehicle">Vehicle</Label>
+              <Select value={filterVehicleId} onValueChange={setFilterVehicleId}>
+                <SelectTrigger id="filter-vehicle" className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="All Vehicles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Vehicles</SelectItem>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.nickname || `${v.year} ${v.make} ${v.model}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <div className="space-y-1.5">
+            <Label htmlFor="filter-category">Category</Label>
+            <Select value={filterCategory} onValueChange={setFilterCategory}>
+              <SelectTrigger id="filter-category" className="w-full sm:w-[180px]">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Select value={filterCompleted} onValueChange={setFilterCompleted}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="All Tasks" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Tasks</SelectItem>
-            <SelectItem value="false">Pending</SelectItem>
-            <SelectItem value="true">Completed</SelectItem>
-          </SelectContent>
-        </Select>
+          <div className="space-y-1.5">
+            <Label htmlFor="filter-status">Status</Label>
+            <Select value={filterCompleted} onValueChange={setFilterCompleted}>
+              <SelectTrigger id="filter-status" className="w-full sm:w-[180px]">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tasks</SelectItem>
+                <SelectItem value="false">Pending</SelectItem>
+                <SelectItem value="true">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as "dueDate" | "category" | "name")}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="dueDate">Due date</SelectItem>
-            <SelectItem value="category">Category</SelectItem>
-            <SelectItem value="name">Name</SelectItem>
-          </SelectContent>
-        </Select>
+          <div className="space-y-1.5">
+            <Label htmlFor="filter-sort">Sort by</Label>
+            <Select
+              value={sortBy}
+              onValueChange={(v) => setSortBy(v as "dueDate" | "category" | "name")}
+            >
+              <SelectTrigger id="filter-sort" className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dueDate">Due date</SelectItem>
+                <SelectItem value="category">Category</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       {/* Tasks List */}
@@ -309,7 +417,7 @@ export default function TasksPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">
-              No tasks found. Add a home to get started!
+              No tasks found. Add a home or vehicle to get started!
             </p>
           </CardContent>
         </Card>
@@ -318,22 +426,37 @@ export default function TasksPage() {
           {sortedTasks.map((task) => (
             <Card key={task.id}>
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <Avatar
+                    className={
+                      task.vehicle
+                        ? "size-10 border-2 border-sky-200 bg-sky-100 text-sky-800"
+                        : "size-10 border-2 border-emerald-200 bg-emerald-100 text-emerald-800"
+                    }
+                  >
+                    <AvatarFallback
+                      className={
+                        task.vehicle
+                          ? "bg-sky-100 text-sky-800 rounded-full"
+                          : "bg-emerald-100 text-emerald-800 rounded-full"
+                      }
+                    >
+                      {task.vehicle ? (
+                        <Car className="size-5" aria-hidden />
+                      ) : (
+                        <Home className="size-5" aria-hidden />
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <CardTitle className="text-lg">{task.name}</CardTitle>
                       <Badge className={getCategoryColor(task.category)}>
                         {task.category}
                       </Badge>
-                      <ComplianceBadge
-                        city={task.home.city}
-                        state={task.home.state}
-                        zipCode={task.home.zipCode}
-                        yearBuilt={task.home.yearBuilt}
-                        homeType={task.home.homeType}
-                        taskCategory={task.category}
-                        taskName={task.name}
-                      />
+                      <Badge variant="outline" className="text-muted-foreground font-normal">
+                        {task.vehicle ? "Vehicle" : "Home"}
+                      </Badge>
                     </div>
                     <CardDescription className="mt-2">
                       {task.description}
@@ -367,10 +490,17 @@ export default function TasksPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Home className="h-4 w-4" />
-                    <span>
-                      {task.home.address}, {task.home.city}, {task.home.state}
-                    </span>
+                    {task.vehicle ? (
+                      <>
+                        <Car className="h-4 w-4 shrink-0 text-sky-700" aria-hidden />
+                        <span>Vehicle: {taskSourceLabel(task)}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Home className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
+                        <span>{taskSourceLabel(task)}</span>
+                      </>
+                    )}
                   </div>
                   {task.costEstimate && (
                     <span>Est. Cost: ${task.costEstimate.toFixed(2)}</span>

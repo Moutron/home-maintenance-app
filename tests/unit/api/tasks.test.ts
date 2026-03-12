@@ -68,6 +68,8 @@ describe("Tasks API", () => {
       clerkId: "user_test123", 
       email: "test@example.com" 
     });
+    // Default: no vehicles (GET /api/tasks uses both homes and vehicles)
+    mockPrisma.vehicle.findMany.mockResolvedValue([]);
   });
 
   describe("GET /api/tasks", () => {
@@ -75,6 +77,7 @@ describe("Tasks API", () => {
       // Mock user lookup/creation
       mockPrisma.user.findUnique.mockResolvedValue({ id: "user_test123", clerkId: "user_test123", email: "test@example.com" });
       mockPrisma.home.findMany.mockResolvedValue([{ id: testData.home.id }]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([]);
       mockPrisma.maintenanceTask.findMany.mockResolvedValue([testData.task]);
 
       const request = new NextRequest("http://localhost:3000/api/tasks");
@@ -88,6 +91,7 @@ describe("Tasks API", () => {
 
     it("should filter tasks by homeId", async () => {
       mockPrisma.home.findMany.mockResolvedValue([{ id: testData.home.id }]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([]);
       mockPrisma.maintenanceTask.findMany.mockResolvedValue([testData.task]);
 
       const request = new NextRequest(
@@ -108,6 +112,7 @@ describe("Tasks API", () => {
 
     it("should filter tasks by completion status", async () => {
       mockPrisma.home.findMany.mockResolvedValue([{ id: testData.home.id }]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([]);
       mockPrisma.maintenanceTask.findMany.mockResolvedValue([testData.task]);
 
       const request = new NextRequest(
@@ -127,6 +132,7 @@ describe("Tasks API", () => {
 
     it("should filter out snoozed tasks", async () => {
       mockPrisma.home.findMany.mockResolvedValue([{ id: testData.home.id }]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([]);
       mockPrisma.maintenanceTask.findMany.mockResolvedValue([]);
 
       const request = new NextRequest("http://localhost:3000/api/tasks");
@@ -162,8 +168,9 @@ describe("Tasks API", () => {
       expect(data.error).toBe("Unauthorized");
     });
 
-    it("should return empty array when user has no homes", async () => {
+    it("should return empty array when user has no homes and no vehicles", async () => {
       mockPrisma.home.findMany.mockResolvedValue([]);
+      // vehicle.findMany already mocked to [] in beforeEach
 
       const request = new NextRequest("http://localhost:3000/api/tasks");
       const response = await GET(request);
@@ -171,6 +178,83 @@ describe("Tasks API", () => {
 
       expect(response.status).toBe(200);
       expect(data.tasks).toEqual([]);
+    });
+
+    it("should return tasks when user has only vehicles (no homes)", async () => {
+      mockPrisma.home.findMany.mockResolvedValue([]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([{ id: testData.vehicle.id }]);
+      const vehicleTask = { ...testData.task, id: "task_vehicle_1", vehicleId: testData.vehicle.id, homeId: null };
+      mockPrisma.maintenanceTask.findMany.mockResolvedValue([vehicleTask]);
+
+      const request = new NextRequest("http://localhost:3000/api/tasks");
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.tasks).toHaveLength(1);
+      expect(mockPrisma.maintenanceTask.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            vehicleId: { in: [testData.vehicle.id] },
+          }),
+        })
+      );
+    });
+
+    it("should filter tasks by vehicleId", async () => {
+      mockPrisma.home.findMany.mockResolvedValue([]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([{ id: testData.vehicle.id }]);
+      mockPrisma.maintenanceTask.findMany.mockResolvedValue([{ ...testData.task, vehicleId: testData.vehicle.id }]);
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/tasks?vehicleId=${testData.vehicle.id}`
+      );
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.maintenanceTask.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            vehicleId: testData.vehicle.id,
+          }),
+        })
+      );
+    });
+
+    it("should filter to only home tasks when source=home", async () => {
+      mockPrisma.home.findMany.mockResolvedValue([{ id: testData.home.id }]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([{ id: testData.vehicle.id }]);
+      mockPrisma.maintenanceTask.findMany.mockResolvedValue([testData.task]);
+
+      const request = new NextRequest("http://localhost:3000/api/tasks?source=home");
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.maintenanceTask.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            homeId: { in: [testData.home.id] },
+          }),
+        })
+      );
+    });
+
+    it("should filter to only vehicle tasks when source=vehicle", async () => {
+      mockPrisma.home.findMany.mockResolvedValue([{ id: testData.home.id }]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([{ id: testData.vehicle.id }]);
+      mockPrisma.maintenanceTask.findMany.mockResolvedValue([{ ...testData.task, vehicleId: testData.vehicle.id }]);
+
+      const request = new NextRequest("http://localhost:3000/api/tasks?source=vehicle");
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.maintenanceTask.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            vehicleId: { in: [testData.vehicle.id] },
+          }),
+        })
+      );
     });
   });
 
@@ -300,6 +384,66 @@ describe("Tasks API", () => {
 
       expect(response.status).toBe(404);
       expect(data.error).toContain("not found");
+    });
+
+    it("should create task with vehicleId (vehicle task)", async () => {
+      mockPrisma.vehicle.findFirst.mockResolvedValue(testData.vehicle);
+      mockPrisma.maintenanceTask.create.mockResolvedValue({
+        ...testData.task,
+        vehicleId: testData.vehicle.id,
+        homeId: null,
+        vehicle: { id: testData.vehicle.id, nickname: testData.vehicle.nickname, year: testData.vehicle.year, make: testData.vehicle.make, model: testData.vehicle.model },
+      } as any);
+
+      const request = new NextRequest("http://localhost:3000/api/tasks", {
+        method: "POST",
+        body: JSON.stringify({
+          vehicleId: testData.vehicle.id,
+          name: "Oil Change",
+          description: "Engine oil and filter",
+          category: "VEHICLE",
+          frequency: "QUARTERLY",
+          nextDueDate: "2024-12-31",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(data.task).toBeDefined();
+      expect(mockPrisma.maintenanceTask.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            homeId: null,
+            vehicleId: testData.vehicle.id,
+            name: "Oil Change",
+            category: "VEHICLE",
+          }),
+        })
+      );
+    });
+
+    it("should return 404 if vehicle not found when creating vehicle task", async () => {
+      mockPrisma.vehicle.findFirst.mockResolvedValue(null);
+
+      const request = new NextRequest("http://localhost:3000/api/tasks", {
+        method: "POST",
+        body: JSON.stringify({
+          vehicleId: "nonexistent",
+          name: "Oil Change",
+          description: "Engine oil",
+          category: "VEHICLE",
+          frequency: "QUARTERLY",
+          nextDueDate: "2024-12-31",
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(data.error).toContain("Vehicle not found");
     });
   });
 

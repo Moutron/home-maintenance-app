@@ -7,6 +7,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -46,6 +47,7 @@ export default function HomesPage() {
   const [homes, setHomes] = useState<Home[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingTasksFor, setGeneratingTasksFor] = useState<string | null>(null);
+  const [generatingAiFor, setGeneratingAiFor] = useState<string | null>(null);
 
   useEffect(() => {
     fetchHomes();
@@ -118,6 +120,47 @@ export default function HomesPage() {
     }
   };
 
+  const removeHome = async (homeId: string, address: string) => {
+    if (!confirm(`Remove "${address}" from your account? All associated tasks, systems, and data for this home will be permanently deleted.`)) return;
+    try {
+      const res = await fetch(`/api/homes/${homeId}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchHomes();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Failed to remove home.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to remove home.");
+    }
+  };
+
+  const generateTasksWithAi = async (homeId: string) => {
+    setGeneratingAiFor(homeId);
+    try {
+      const response = await fetch("/api/tasks/generate-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ homeId }),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const message = result.message || `Generated ${result.aiTasksCount ?? 0} AI tasks + ${result.complianceTasksCount ?? 0} compliance tasks.`;
+        alert(message);
+        router.push("/tasks");
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.error || errorData.message || "AI generation failed. Try Generate Tasks (templates).");
+      }
+    } catch (error) {
+      console.error("Error generating AI tasks:", error);
+      alert("Failed to generate tasks.");
+    } finally {
+      setGeneratingAiFor(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -157,9 +200,9 @@ export default function HomesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 items-stretch">
           {homes.map((home) => (
-            <Card key={home.id}>
+            <Card key={home.id} className="flex flex-col h-full">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
@@ -171,47 +214,49 @@ export default function HomesPage() {
                   <Badge variant="outline">{home.homeType}</Badge>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="flex-1 flex flex-col min-h-0">
+                <div className="space-y-4 flex-1">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Year Built:</span>
                       <p className="font-medium">{home.yearBuilt}</p>
                     </div>
-                    {home.squareFootage && (
-                      <div>
-                        <span className="text-muted-foreground">
-                          Square Feet:
-                        </span>
-                        <p className="font-medium">
-                          {home.squareFootage.toLocaleString()}
-                        </p>
-                      </div>
-                    )}
-                    {home.lotSize && (
-                      <div>
-                        <span className="text-muted-foreground">Lot Size:</span>
-                        <p className="font-medium">
-                          {home.lotSize} acres
-                        </p>
-                      </div>
-                    )}
-                    {home.climateZone && (
-                      <div>
-                        <span className="text-muted-foreground">
-                          Climate Zone:
-                        </span>
-                        <p className="font-medium">{home.climateZone}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {home.systems.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                        <Wrench className="h-4 w-4" />
-                        Systems ({home.systems.length})
-                      </h4>
+                      <span className="text-muted-foreground">
+                        Square Feet:
+                      </span>
+                      <p className="font-medium">
+                        {home.squareFootage != null
+                          ? home.squareFootage.toLocaleString()
+                          : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Lot Size:</span>
+                      <p className="font-medium">
+                        {home.lotSize != null ? `${home.lotSize} acres` : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Climate Zone:
+                      </span>
+                      <p className="font-medium">
+                        {home.climateZone ?? "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Optional fields (square feet, lot size, climate) can be
+                    added when editing the home.
+                  </p>
+
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <Wrench className="h-4 w-4" />
+                      Systems ({home.systems.length})
+                    </h4>
+                    {home.systems.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {home.systems.map((system) => (
                           <Badge key={system.id} variant="secondary">
@@ -220,131 +265,149 @@ export default function HomesPage() {
                           </Badge>
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => generateTasks(home.id)}
-                      disabled={generatingTasksFor === home.id}
-                    >
-                      {generatingTasksFor === home.id ? "Generating..." : "Generate Tasks"}
-                    </Button>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="flex-1">
-                          View Details
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>{home.address}</DialogTitle>
-                          <DialogDescription>
-                            <div className="mt-4 space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <span className="text-sm text-muted-foreground">
-                                    Address:
-                                  </span>
-                                  <p className="font-medium">
-                                    {home.address}, {home.city}, {home.state}{" "}
-                                    {home.zipCode}
-                                  </p>
-                                </div>
-                                <div>
-                                  <span className="text-sm text-muted-foreground">
-                                    Year Built:
-                                  </span>
-                                  <p className="font-medium">{home.yearBuilt}</p>
-                                </div>
-                                <div>
-                                  <span className="text-sm text-muted-foreground">
-                                    Home Type:
-                                  </span>
-                                  <p className="font-medium">{home.homeType}</p>
-                                </div>
-                                {home.squareFootage && (
-                                  <div>
-                                    <span className="text-sm text-muted-foreground">
-                                      Square Footage:
-                                    </span>
-                                    <p className="font-medium">
-                                      {home.squareFootage.toLocaleString()} sq ft
-                                    </p>
-                                  </div>
-                                )}
-                                {home.lotSize && (
-                                  <div>
-                                    <span className="text-sm text-muted-foreground">
-                                      Lot Size:
-                                    </span>
-                                    <p className="font-medium">
-                                      {home.lotSize} acres
-                                    </p>
-                                  </div>
-                                )}
-                                {home.climateZone && (
-                                  <div>
-                                    <span className="text-sm text-muted-foreground">
-                                      Climate Zone:
-                                    </span>
-                                    <p className="font-medium">
-                                      {home.climateZone}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-
-                              {home.systems.length > 0 && (
-                                <div>
-                                  <h4 className="font-semibold mb-2">
-                                    Systems & Appliances
-                                  </h4>
-                                  <div className="space-y-2">
-                                    {home.systems.map((system) => (
-                                      <div
-                                        key={system.id}
-                                        className="border rounded-lg p-3"
-                                      >
-                                        <div className="font-medium">
-                                          {system.systemType}
-                                        </div>
-                                        {(system.brand || system.model) && (
-                                          <div className="text-sm text-muted-foreground">
-                                            {system.brand && (
-                                              <span>Brand: {system.brand}</span>
-                                            )}
-                                            {system.brand && system.model && (
-                                              <span> • </span>
-                                            )}
-                                            {system.model && (
-                                              <span>Model: {system.model}</span>
-                                            )}
-                                          </div>
-                                        )}
-                                        {system.installDate && (
-                                          <div className="text-sm text-muted-foreground">
-                                            Installed:{" "}
-                                            {new Date(
-                                              system.installDate
-                                            ).toLocaleDateString()}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </DialogDescription>
-                        </DialogHeader>
-                      </DialogContent>
-                    </Dialog>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        None yet. Add systems in View Details for better task
+                        suggestions.
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
+              <CardFooter className="grid grid-cols-2 gap-2 border-t pt-6">
+                <Button
+                  className="w-full"
+                  onClick={() => generateTasksWithAi(home.id)}
+                  disabled={generatingAiFor === home.id || generatingTasksFor === home.id}
+                >
+                  {generatingAiFor === home.id ? "Mapping…" : "Map your maintenance"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => generateTasks(home.id)}
+                  disabled={generatingTasksFor === home.id || generatingAiFor === home.id}
+                >
+                  {generatingTasksFor === home.id ? "Generating..." : "Quick add (templates)"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full text-destructive hover:text-destructive"
+                  onClick={() => removeHome(home.id, home.address)}
+                >
+                  Remove home
+                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full">
+                      View Details
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>{home.address}</DialogTitle>
+                      <DialogDescription>
+                        <div className="mt-4 space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-sm text-muted-foreground">
+                                Address:
+                              </span>
+                              <p className="font-medium">
+                                {home.address}, {home.city}, {home.state}{" "}
+                                {home.zipCode}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-muted-foreground">
+                                Year Built:
+                              </span>
+                              <p className="font-medium">{home.yearBuilt}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-muted-foreground">
+                                Home Type:
+                              </span>
+                              <p className="font-medium">{home.homeType}</p>
+                            </div>
+                            {home.squareFootage && (
+                              <div>
+                                <span className="text-sm text-muted-foreground">
+                                  Square Footage:
+                                </span>
+                                <p className="font-medium">
+                                  {home.squareFootage.toLocaleString()} sq ft
+                                </p>
+                              </div>
+                            )}
+                            {home.lotSize && (
+                              <div>
+                                <span className="text-sm text-muted-foreground">
+                                  Lot Size:
+                                </span>
+                                <p className="font-medium">
+                                  {home.lotSize} acres
+                                </p>
+                              </div>
+                            )}
+                            {home.climateZone && (
+                              <div>
+                                <span className="text-sm text-muted-foreground">
+                                  Climate Zone:
+                                </span>
+                                <p className="font-medium">
+                                  {home.climateZone}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {home.systems.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold mb-2">
+                                Systems & Appliances
+                              </h4>
+                              <div className="space-y-2">
+                                {home.systems.map((system) => (
+                                  <div
+                                    key={system.id}
+                                    className="border rounded-lg p-3"
+                                  >
+                                    <div className="font-medium">
+                                      {system.systemType}
+                                    </div>
+                                    {(system.brand || system.model) && (
+                                      <div className="text-sm text-muted-foreground">
+                                        {system.brand && (
+                                          <span>Brand: {system.brand}</span>
+                                        )}
+                                        {system.brand && system.model && (
+                                          <span> • </span>
+                                        )}
+                                        {system.model && (
+                                          <span>Model: {system.model}</span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {system.installDate && (
+                                      <div className="text-sm text-muted-foreground">
+                                        Installed:{" "}
+                                        {new Date(
+                                          system.installDate
+                                        ).toLocaleDateString()}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </DialogDescription>
+                    </DialogHeader>
+                  </DialogContent>
+                </Dialog>
+              </CardFooter>
             </Card>
           ))}
         </div>

@@ -44,25 +44,44 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const homeId = searchParams.get("homeId");
+    const vehicleIdParam = searchParams.get("vehicleId");
+    const source = searchParams.get("source"); // "home" | "vehicle" – limit to home or vehicle tasks when no specific id
     const completed = searchParams.get("completed");
     const category = searchParams.get("category");
 
-    // Get user's homes
     const homes = await prisma.home.findMany({
       where: { userId: user.id },
       select: { id: true },
     });
-
+    const vehicles = await prisma.vehicle.findMany({
+      where: { userId: user.id },
+      select: { id: true },
+    });
     const homeIds = homes.map((h: { id: string }) => h.id);
+    const vehicleIds = vehicles.map((v: { id: string }) => v.id);
 
-    if (homeIds.length === 0) {
+    if (homeIds.length === 0 && vehicleIds.length === 0) {
       return NextResponse.json({ tasks: [] });
     }
 
-    // Build where clause
+    let taskOwnerCondition: Prisma.MaintenanceTaskWhereInput;
+    if (homeId && homeIds.includes(homeId)) {
+      taskOwnerCondition = { homeId };
+    } else if (vehicleIdParam && vehicleIds.includes(vehicleIdParam)) {
+      taskOwnerCondition = { vehicleId: vehicleIdParam };
+    } else if (source === "home" && homeIds.length > 0) {
+      taskOwnerCondition = { homeId: { in: homeIds } };
+    } else if (source === "vehicle" && vehicleIds.length > 0) {
+      taskOwnerCondition = { vehicleId: { in: vehicleIds } };
+    } else {
+      const ownerConditions: Prisma.MaintenanceTaskWhereInput[] = [];
+      if (homeIds.length > 0) ownerConditions.push({ homeId: { in: homeIds } });
+      if (vehicleIds.length > 0) ownerConditions.push({ vehicleId: { in: vehicleIds } });
+      taskOwnerCondition = ownerConditions.length === 1 ? ownerConditions[0]! : { OR: ownerConditions };
+    }
+
     const where: Prisma.MaintenanceTaskWhereInput = {
-      homeId: homeId ? homeId : { in: homeIds },
-      // Filter out snoozed tasks (only show if snoozedUntil is null or in the past)
+      ...taskOwnerCondition,
       AND: [
         {
           OR: [
@@ -73,7 +92,7 @@ export async function GET(request: NextRequest) {
       ],
     };
 
-    if (completed !== null) {
+    if (completed !== null && completed !== undefined) {
       where.completed = completed === "true";
     }
 
@@ -96,6 +115,15 @@ export async function GET(request: NextRequest) {
             systems: {
               select: { id: true, systemType: true, brand: true, model: true },
             },
+          },
+        },
+        vehicle: {
+          select: {
+            id: true,
+            nickname: true,
+            year: true,
+            make: true,
+            model: true,
           },
         },
         template: {
@@ -145,14 +173,42 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createTaskSchema.parse(body);
 
-    // Verify home belongs to user
-    const home = await prisma.home.findFirst({
-      where: {
-        id: validatedData.homeId,
-        userId: user.id,
-      },
-    });
+    if (validatedData.vehicleId) {
+      const vehicle = await prisma.vehicle.findFirst({
+        where: { id: validatedData.vehicleId, userId: user.id },
+      });
+      if (!vehicle) {
+        return NextResponse.json(
+          { error: "Vehicle not found or access denied" },
+          { status: 404 }
+        );
+      }
+      const task = await prisma.maintenanceTask.create({
+        data: {
+          homeId: null,
+          vehicleId: validatedData.vehicleId,
+          templateId: validatedData.templateId,
+          name: validatedData.name,
+          description: validatedData.description,
+          category: validatedData.category,
+          frequency: validatedData.frequency,
+          nextDueDate: new Date(validatedData.nextDueDate),
+          costEstimate: validatedData.costEstimate,
+          notes: validatedData.notes,
+          snoozedUntil: validatedData.snoozedUntil ? new Date(validatedData.snoozedUntil) : null,
+          customRecurrence: validatedData.customRecurrence ?? undefined,
+        },
+        include: {
+          vehicle: { select: { id: true, nickname: true, year: true, make: true, model: true } },
+          template: { select: { id: true, name: true, description: true, educationalContent: true, diyDifficulty: true } },
+        },
+      });
+      return NextResponse.json({ task }, { status: 201 });
+    }
 
+    const home = await prisma.home.findFirst({
+      where: { id: validatedData.homeId!, userId: user.id },
+    });
     if (!home) {
       return NextResponse.json(
         { error: "Home not found or access denied" },
@@ -162,7 +218,8 @@ export async function POST(request: NextRequest) {
 
     const task = await prisma.maintenanceTask.create({
       data: {
-        homeId: validatedData.homeId,
+        homeId: validatedData.homeId!,
+        vehicleId: null,
         templateId: validatedData.templateId,
         name: validatedData.name,
         description: validatedData.description,
@@ -175,12 +232,8 @@ export async function POST(request: NextRequest) {
         customRecurrence: validatedData.customRecurrence ?? undefined,
       },
       include: {
-        home: {
-          select: {
-            id: true,
-            address: true,
-          },
-        },
+        home: { select: { id: true, address: true } },
+        template: { select: { id: true, name: true, description: true, educationalContent: true, diyDifficulty: true } },
       },
     });
 
@@ -229,28 +282,26 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Verify task belongs to user's home
     const task = await prisma.maintenanceTask.findUnique({
       where: { id },
-      include: {
-        home: true,
-      },
+      include: { home: true, vehicle: true },
     });
 
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    const userHomes = await prisma.home.findMany({
-      where: { userId: user.id },
-      select: { id: true },
-    });
-
-    if (!userHomes.some((h: { id: string }) => h.id === task.homeId)) {
-      return NextResponse.json(
-        { error: "Access denied" },
-        { status: 403 }
-      );
+    const [userHomes, userVehicles] = await Promise.all([
+      prisma.home.findMany({ where: { userId: user.id }, select: { id: true } }),
+      prisma.vehicle.findMany({ where: { userId: user.id }, select: { id: true } }),
+    ]);
+    const homeIds = userHomes.map((h: { id: string }) => h.id);
+    const vehicleIds = userVehicles.map((v: { id: string }) => v.id);
+    const ownsTask =
+      (task.homeId && homeIds.includes(task.homeId)) ||
+      (task.vehicleId && vehicleIds.includes(task.vehicleId));
+    if (!ownsTask) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     const validatedData = updateTaskSchema.parse(updateData);
