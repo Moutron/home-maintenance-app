@@ -182,16 +182,30 @@ export default function GaragePage() {
       const res = await fetch(`/api/vehicles/${vehicleId}/generate-tasks-ai`, {
         method: "POST",
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        alert(data.message || "Tasks generated from owner's manual schedule.");
+        alert(
+          (data && data.message) ||
+            "Tasks generated from owner's manual schedule."
+        );
         router.push(`/tasks?vehicleId=${vehicleId}`);
-      } else {
-        alert(data.error || "AI generation failed. Try Quick add from templates.");
+        return;
       }
+
+      // Non-OK response from AI: fall back to template-based generation
+      console.error("AI vehicle task generation error:", data);
+      alert(
+        (data && data.error) ||
+          "AI isn't available right now. We'll use Quick add from templates instead."
+      );
+      await generateTasks(vehicleId);
     } catch (e) {
-      console.error(e);
-      alert("Failed to generate tasks.");
+      // Network or unexpected error: also fall back to templates
+      console.error("Error generating vehicle AI tasks:", e);
+      alert(
+        "AI isn't available right now. We'll use Quick add from templates instead."
+      );
+      await generateTasks(vehicleId);
     } finally {
       setGeneratingAiFor(null);
     }

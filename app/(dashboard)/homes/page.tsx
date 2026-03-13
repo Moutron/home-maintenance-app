@@ -146,16 +146,31 @@ export default function HomesPage() {
       });
       if (response.ok) {
         const result = await response.json();
-        const message = result.message || `Generated ${result.aiTasksCount ?? 0} AI tasks + ${result.complianceTasksCount ?? 0} compliance tasks.`;
+        const message =
+          result.message ||
+          `Generated ${result.aiTasksCount ?? 0} AI tasks + ${
+            result.complianceTasksCount ?? 0
+          } compliance tasks.`;
         alert(message);
         router.push("/tasks");
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        alert(errorData.error || errorData.message || "AI generation failed. Try Generate Tasks (templates).");
+        return;
       }
+
+      // Non-OK response from AI: fall back to template-based generation
+      const errorData = await response.json().catch(() => ({}));
+      console.error("AI home task generation error:", errorData);
+      alert(
+        (errorData && (errorData.error || errorData.message)) ||
+          "AI isn't available right now. We'll use Quick add from templates instead."
+      );
+      await generateTasks(homeId);
     } catch (error) {
+      // Network or unexpected error: also fall back to templates
       console.error("Error generating AI tasks:", error);
-      alert("Failed to generate tasks.");
+      alert(
+        "AI isn't available right now. We'll use Quick add from templates instead."
+      );
+      await generateTasks(homeId);
     } finally {
       setGeneratingAiFor(null);
     }
