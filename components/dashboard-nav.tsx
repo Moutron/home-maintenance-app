@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 import { navigation } from "@/lib/dashboard-nav-config";
 
 const sections = [
-  { label: "Overview", start: 0, end: 2 },
-  { label: "Track & plan", start: 2, end: 7 },
+  { label: "Overview", start: 0, end: 3 },
+  { label: "Track & plan", start: 3, end: 7 },
   { label: "Records", start: 7, end: 10 },
   { label: "Planning", start: 10, end: 11 },
   { label: "Account", start: 11, end: 12 },

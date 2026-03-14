@@ -52,12 +52,21 @@ describe("Dashboard API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockClerkAuth();
-    // Setup default user mock
     mockPrisma.user.findUnique.mockResolvedValue({
       id: "user_test123",
       clerkId: "user_test123",
       email: "test@example.com",
     });
+    // Default [] for all Prisma findMany used by dashboard route so .map never runs on undefined
+    mockPrisma.home.findMany.mockResolvedValue([]);
+    mockPrisma.vehicle.findMany.mockResolvedValue([]);
+    mockPrisma.maintenanceTask.findMany.mockResolvedValue([]);
+    mockPrisma.maintenanceHistory.findMany.mockResolvedValue([]);
+    mockPrisma.appliance.findMany.mockResolvedValue([]);
+    mockPrisma.exteriorFeature.findMany.mockResolvedValue([]);
+    mockPrisma.interiorFeature.findMany.mockResolvedValue([]);
+    mockPrisma.homeSystem.findMany.mockResolvedValue([]);
+    mockPrisma.completedTask.findMany.mockResolvedValue([]);
   });
 
   describe("GET /api/dashboard", () => {

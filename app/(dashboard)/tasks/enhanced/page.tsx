@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { PageLoading } from "@/components/page-loading";
 
 type Task = {
   id: string;
@@ -265,11 +266,7 @@ export default function EnhancedTasksPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading tasks...</p>
-      </div>
-    );
+    return <PageLoading message="Loading tasks..." />;
   }
 
   return (

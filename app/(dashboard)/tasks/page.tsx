@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import Link from "next/link";
+import { PageLoading } from "@/components/page-loading";
 
 type Task = {
   id: string;
@@ -83,14 +84,27 @@ export default function TasksPage() {
   const [howToCache, setHowToCache] = useState<Record<string, string>>({});
   const [howToLoading, setHowToLoading] = useState<string | null>(null);
 
+  // Fetch all tasks once on mount; filtering is done client-side so changing filters doesn't trigger loading
   useEffect(() => {
     fetchTasks();
-  }, [filterSource, filterHomeId, filterVehicleId, filterCategory, filterCompleted]);
+  }, []);
 
   useEffect(() => {
     fetchHomes();
     fetchVehicles();
   }, []);
+
+  // When source changes, clear category if it no longer applies (e.g. Vehicle + HVAC)
+  useEffect(() => {
+    const vehicleCategories = ["VEHICLE", "OTHER"];
+    const homeCategories = ["HVAC", "PLUMBING", "EXTERIOR", "STRUCTURAL", "LANDSCAPING", "APPLIANCE", "SAFETY", "ELECTRICAL", "OTHER"];
+    if (filterSource === "vehicle" && filterCategory !== "all" && !vehicleCategories.includes(filterCategory)) {
+      setFilterCategory("all");
+    }
+    if (filterSource === "home" && filterCategory !== "all" && !homeCategories.includes(filterCategory)) {
+      setFilterCategory("all");
+    }
+  }, [filterSource]);
 
   const fetchHomes = async () => {
     try {
@@ -152,29 +166,7 @@ export default function TasksPage() {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filterSource === "home") {
-        if (filterHomeId !== "all") {
-          params.append("homeId", filterHomeId);
-        } else {
-          params.append("source", "home");
-        }
-      }
-      if (filterSource === "vehicle") {
-        if (filterVehicleId !== "all") {
-          params.append("vehicleId", filterVehicleId);
-        } else {
-          params.append("source", "vehicle");
-        }
-      }
-      if (filterCategory !== "all") {
-        params.append("category", filterCategory);
-      }
-      if (filterCompleted !== "all") {
-        params.append("completed", filterCompleted);
-      }
-
-      const response = await fetch(`/api/tasks?${params.toString()}`);
+      const response = await fetch("/api/tasks");
       if (response.ok) {
         const data = await response.json();
         setTasks(data.tasks || []);
@@ -207,7 +199,7 @@ export default function TasksPage() {
     }
   };
 
-  const categories = [
+  const allCategories = [
     "HVAC",
     "PLUMBING",
     "EXTERIOR",
@@ -219,6 +211,15 @@ export default function TasksPage() {
     "VEHICLE",
     "OTHER",
   ];
+
+  const homeCategories = allCategories.filter((c) => c !== "VEHICLE");
+  const vehicleCategories = ["VEHICLE", "OTHER"];
+  const categoriesForSource =
+    filterSource === "home"
+      ? homeCategories
+      : filterSource === "vehicle"
+        ? vehicleCategories
+        : allCategories;
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
@@ -274,24 +275,35 @@ export default function TasksPage() {
     return categoryToSystemType[task.category] != null && !homeHasRelevantSystemWithDetails(task);
   };
 
-  const sortedTasks = [...tasks].sort((a, b) => {
-    if (sortBy === "dueDate") {
-      return new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
-    }
-    if (sortBy === "category") {
-      const cat = a.category.localeCompare(b.category);
-      return cat !== 0 ? cat : new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
-    }
-    const name = a.name.localeCompare(b.name);
-    return name !== 0 ? name : new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
-  });
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (filterSource === "home" && !task.home) return false;
+      if (filterSource === "vehicle" && !task.vehicle) return false;
+      if (filterSource === "home" && filterHomeId !== "all" && task.home?.id !== filterHomeId) return false;
+      if (filterSource === "vehicle" && filterVehicleId !== "all" && task.vehicle?.id !== filterVehicleId) return false;
+      if (filterCategory !== "all" && task.category !== filterCategory) return false;
+      if (filterCompleted === "true" && !task.completed) return false;
+      if (filterCompleted === "false" && task.completed) return false;
+      return true;
+    });
+  }, [tasks, filterSource, filterHomeId, filterVehicleId, filterCategory, filterCompleted]);
+
+  const sortedTasks = useMemo(() => {
+    return [...filteredTasks].sort((a, b) => {
+      if (sortBy === "dueDate") {
+        return new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
+      }
+      if (sortBy === "category") {
+        const cat = a.category.localeCompare(b.category);
+        return cat !== 0 ? cat : new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
+      }
+      const name = a.name.localeCompare(b.name);
+      return name !== 0 ? name : new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime();
+    });
+  }, [filteredTasks, sortBy]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading tasks...</p>
-      </div>
-    );
+    return <PageLoading message="Loading tasks..." />;
   }
 
   return (
@@ -306,7 +318,7 @@ export default function TasksPage() {
       {/* Filters — narrow the list by source, home/vehicle, category, and status */}
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">
-          Use the filters below to show only the tasks you want. Changing any filter reloads the task list.
+          Use the filters below to narrow the list. Category options depend on source (e.g. vehicle tasks only show vehicle-related categories).
         </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
           <div className="space-y-1.5">
@@ -370,7 +382,7 @@ export default function TasksPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((cat) => (
+                {categoriesForSource.map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {cat}
                   </SelectItem>
@@ -413,11 +425,13 @@ export default function TasksPage() {
       </div>
 
       {/* Tasks List */}
-      {tasks.length === 0 ? (
+      {filteredTasks.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">
-              No tasks found. Add a home or vehicle to get started!
+              {tasks.length === 0
+                ? "No tasks found. Add a home or vehicle to get started!"
+                : "No tasks match the current filters. Try changing or clearing a filter."}
             </p>
           </CardContent>
         </Card>

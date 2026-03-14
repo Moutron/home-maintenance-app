@@ -99,7 +99,7 @@ describe("Tasks Page", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/use the filters below to show only the tasks you want/i)
+        screen.getByText(/use the filters below to narrow the list/i)
       ).toBeInTheDocument();
     });
   });

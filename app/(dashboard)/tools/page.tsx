@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Trash2, Edit, Wrench, Camera } from "lucide-react";
+import { PageLoading } from "@/components/page-loading";
 import { ToolPhotoUpload } from "@/components/tool-photo-upload";
 import {
   Accordion,
@@ -296,10 +297,7 @@ export default function ToolInventoryPage() {
   if (!mounted || loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading tools...</p>
-        </div>
+        <PageLoading message="Loading tools..." />
       </div>
     );
   }

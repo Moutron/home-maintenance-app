@@ -139,6 +139,7 @@ describe("Notifications API", () => {
   describe("POST /api/notifications/send-reminders", () => {
     it("should send task reminders", async () => {
       mockPrisma.home.findMany.mockResolvedValue([{ id: testData.home.id }]);
+      mockPrisma.vehicle.findMany.mockResolvedValue([]);
       mockPrisma.maintenanceTask.findMany.mockResolvedValue([
         {
           ...testData.task,

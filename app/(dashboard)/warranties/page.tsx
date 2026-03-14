@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageLoading } from "@/components/page-loading";
 import { AlertTriangle, CheckCircle2, Clock, FileText } from "lucide-react";
 
 type Warranty = {
@@ -205,11 +206,7 @@ export default function WarrantiesPage() {
   });
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading warranties...</p>
-      </div>
-    );
+    return <PageLoading message="Loading warranties..." />;
   }
 
   return (

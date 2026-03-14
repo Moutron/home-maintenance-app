@@ -21,6 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { PageLoading } from "@/components/page-loading";
 
 type Home = {
   id: string;
@@ -177,11 +178,7 @@ export default function HomesPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading homes...</p>
-      </div>
-    );
+    return <PageLoading message="Loading homes..." />;
   }
 
   return (

@@ -24,7 +24,7 @@ async function getOrCreateUser(clerkId: string, email: string) {
   return user;
 }
 
-// Calculate next due date based on frequency and optimal timing
+// Calculate a single next due date based on frequency and optimal timing
 function calculateNextDueDate(
   frequency: string,
   optimalMonth?: number | null,
@@ -33,17 +33,12 @@ function calculateNextDueDate(
   const now = new Date();
   const date = new Date(now);
 
-  // If optimal month is specified, schedule for that month
   if (optimalMonth) {
     date.setMonth(optimalMonth - 1);
-    date.setDate(1); // First of the month
-    if (date < now) {
-      date.setFullYear(date.getFullYear() + 1);
-    }
+    date.setDate(1);
+    if (date < now) date.setFullYear(date.getFullYear() + 1);
     return date;
   }
-
-  // If optimal season is specified, schedule for that season
   if (optimalSeason && optimalSeason !== "all") {
     const seasonMonths: Record<string, number> = {
       spring: 3,
@@ -54,13 +49,9 @@ function calculateNextDueDate(
     const targetMonth = seasonMonths[optimalSeason] || 3;
     date.setMonth(targetMonth - 1);
     date.setDate(1);
-    if (date < now) {
-      date.setFullYear(date.getFullYear() + 1);
-    }
+    if (date < now) date.setFullYear(date.getFullYear() + 1);
     return date;
   }
-
-  // Otherwise, use frequency
   switch (frequency) {
     case "WEEKLY":
       date.setDate(date.getDate() + 7);
@@ -87,6 +78,76 @@ function calculateNextDueDate(
       date.setMonth(date.getMonth() + 1);
   }
   return date;
+}
+
+/** Returns all due dates for this task type over the next 12 months (full year schedule). */
+function getDueDatesForNextYear(
+  frequency: string,
+  optimalMonth?: number | null,
+  optimalSeason?: string | null
+): Date[] {
+  const now = new Date();
+  const yearEnd = new Date(now.getFullYear() + 1, 0, 0); // last day of current year
+  const dates: Date[] = [];
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+  switch (frequency) {
+    case "WEEKLY": {
+      const d = new Date(now);
+      d.setDate(d.getDate() + 7);
+      while (d <= yearEnd && dates.length < 52) {
+        dates.push(new Date(d));
+        d.setDate(d.getDate() + 7);
+      }
+      break;
+    }
+    case "MONTHLY": {
+      for (let i = 1; i <= 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        if (d <= yearEnd) dates.push(d);
+      }
+      break;
+    }
+    case "QUARTERLY": {
+      const startMonth = now.getMonth();
+      for (let i = 1; i <= 4; i++) {
+        const d = new Date(now.getFullYear(), startMonth + i * 3, 1);
+        if (d >= now && d <= yearEnd) dates.push(d);
+      }
+      break;
+    }
+    case "BIANNUAL": {
+      const d1 = new Date(now.getFullYear(), now.getMonth(), 1);
+      if (d1 < now) d1.setMonth(d1.getMonth() + 1);
+      const d2 = new Date(d1.getFullYear(), d1.getMonth() + 6, 1);
+      if (d1 >= now && d1 <= yearEnd) dates.push(d1);
+      if (d2 >= now && d2 <= yearEnd) dates.push(d2);
+      if (dates.length === 0) dates.push(new Date(now.getFullYear() + 1, now.getMonth(), 1));
+      break;
+    }
+    case "ANNUAL":
+    case "SEASONAL":
+    case "AS_NEEDED": {
+      const single = calculateNextDueDate(frequency, optimalMonth, optimalSeason);
+      dates.push(single);
+      break;
+    }
+    default: {
+      const single = calculateNextDueDate(frequency, optimalMonth, optimalSeason);
+      dates.push(single);
+    }
+  }
+
+  const seen = new Set<string>();
+  return dates
+    .filter((d) => {
+      const k = monthKey(d);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return d >= now;
+    })
+    .sort((a, b) => a.getTime() - b.getTime())
+    .slice(0, 12);
 }
 
 export async function POST(request: NextRequest) {
@@ -227,13 +288,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create a map of task names to IDs for dependency resolution
+    // Existing tasks: dedupe by (name + month) so we can have same task name in different months
+    const existingRows = (await prisma.maintenanceTask.findMany({
+      where: { homeId: home.id },
+      select: { name: true, nextDueDate: true },
+    })) || [];
+    const existingTaskNameMonths = new Set(
+      existingRows.map((t: { name: string; nextDueDate: Date }) => {
+        const d = new Date(t.nextDueDate);
+        return `${t.name.toLowerCase().trim()}|${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      })
+    );
+
     const taskNameToId = new Map<string, string>();
     const createdTasks: Awaited<ReturnType<typeof prisma.maintenanceTask.create>>[] = [];
 
-    // First pass: create all tasks
+    // First pass: create AI tasks with a full year of due dates (one task per occurrence)
     for (const task of aiResponse) {
-      const nextDueDate = calculateNextDueDate(
+      const nameKey = task.name.toLowerCase().trim();
+      const dueDates = getDueDatesForNextYear(
         task.frequency,
         task.optimalMonth,
         task.optimalSeason
@@ -244,39 +317,42 @@ export async function POST(request: NextRequest) {
           ? (task.costEstimateMin + task.costEstimateMax) / 2
           : null;
 
-      const createdTask = await prisma.maintenanceTask.create({
-        data: {
-          homeId: home.id,
-          name: task.name,
-          description: task.description,
-          category: task.category,
-          frequency: task.frequency,
-          nextDueDate: nextDueDate,
-          costEstimate: costEstimate,
-          aiExplanation: task.explanation,
-          priority: task.priority,
-          relatedItemId: task.relatedItemId || null,
-          relatedItemType: task.relatedItemType || null,
-        },
-      });
+      for (const nextDueDate of dueDates) {
+        const monthKey = `${nameKey}|${nextDueDate.getFullYear()}-${String(nextDueDate.getMonth() + 1).padStart(2, "0")}`;
+        if (existingTaskNameMonths.has(monthKey)) continue;
 
-      taskNameToId.set(task.name, createdTask.id);
-      createdTasks.push(createdTask);
+        const createdTask = await prisma.maintenanceTask.create({
+          data: {
+            homeId: home.id,
+            name: task.name,
+            description: task.description,
+            category: task.category,
+            frequency: task.frequency,
+            nextDueDate: nextDueDate,
+            costEstimate: costEstimate,
+            aiExplanation: task.explanation,
+            priority: task.priority,
+            relatedItemId: task.relatedItemId || null,
+            relatedItemType: task.relatedItemType || null,
+          },
+        });
+
+        existingTaskNameMonths.add(monthKey);
+        if (!taskNameToId.has(task.name)) taskNameToId.set(task.name, createdTask.id);
+        createdTasks.push(createdTask);
+      }
     }
 
-    // Second pass: update dependencies
-    for (let i = 0; i < aiResponse.length; i++) {
-      const task = aiResponse[i];
-      const createdTask = createdTasks[i];
-
-      if (task.dependsOnTaskName) {
-        const dependsOnId = taskNameToId.get(task.dependsOnTaskName);
-        if (dependsOnId) {
-          await prisma.maintenanceTask.update({
-            where: { id: createdTask.id },
-            data: { dependsOnTaskId: dependsOnId },
-          });
-        }
+    // Second pass: set dependencies on the first occurrence of each dependent task
+    for (const task of aiResponse) {
+      if (!task.dependsOnTaskName) continue;
+      const myFirstId = taskNameToId.get(task.name);
+      const dependsOnId = taskNameToId.get(task.dependsOnTaskName);
+      if (myFirstId && dependsOnId) {
+        await prisma.maintenanceTask.update({
+          where: { id: myFirstId },
+          data: { dependsOnTaskId: dependsOnId },
+        });
       }
     }
 
@@ -289,9 +365,15 @@ export async function POST(request: NextRequest) {
       home.homeType
     );
 
-    // Create compliance tasks in database
+    // Create compliance tasks (skip if same name already exists for that month)
     const createdComplianceTasks = [];
     for (const task of complianceTasks) {
+      const nameKey = task.name.toLowerCase().trim();
+      const d = new Date(task.nextDueDate);
+      const monthKey = `${nameKey}|${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (existingTaskNameMonths.has(monthKey)) continue;
+      existingTaskNameMonths.add(monthKey);
+
       const createdTask = await prisma.maintenanceTask.create({
         data: {
           homeId: home.id,

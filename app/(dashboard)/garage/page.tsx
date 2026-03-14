@@ -36,6 +36,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import Link from "next/link";
+import { PageLoading } from "@/components/page-loading";
 import { COMMON_VEHICLE_MAKES } from "@/lib/vehicles/common-makes";
 
 type Vehicle = {
@@ -262,11 +263,7 @@ export default function GaragePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading vehicles...</p>
-      </div>
-    );
+    return <PageLoading message="Loading vehicles..." />;
   }
 
   return (

@@ -32,6 +32,7 @@ import { CalendarIcon, Home, Filter, Image as ImageIcon, FileText, DollarSign } 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { PageLoading } from "@/components/page-loading";
 import { PhotoUpload } from "@/components/photo-upload";
 
 type MaintenanceHistory = {
@@ -166,11 +167,7 @@ export default function MaintenanceHistoryPage() {
   const totalCost = history.reduce((sum, record) => sum + (record.cost || 0), 0);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading maintenance history...</p>
-      </div>
-    );
+    return <PageLoading message="Loading maintenance history..." />;
   }
 
   return (

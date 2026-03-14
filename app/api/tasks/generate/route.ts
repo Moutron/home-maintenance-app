@@ -207,6 +207,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Load existing tasks for this home to avoid duplicates (e.g. re-running generate or same name from template + compliance)
+    const existingTasks = (await prisma.maintenanceTask.findMany({
+      where: { homeId: home.id },
+      select: { name: true, templateId: true },
+    })) || [];
+    const existingNames = new Set(existingTasks.map((t: { name: string }) => t.name.toLowerCase().trim()));
+    const existingTemplateIds = new Set((existingTasks.map((t: { templateId: string | null }) => t.templateId).filter(Boolean) as string[]));
+
     console.log("[22] Calculating home age and season...");
     // Calculate home age
     const homeAge = new Date().getFullYear() - home.yearBuilt;
@@ -223,6 +231,8 @@ export async function POST(request: NextRequest) {
       if (templateIndex % 10 === 0) {
         console.log(`[24.${templateIndex}] Processing template ${templateIndex}/${templates.length}: ${template.name}`);
       }
+      // Skip if we already have a task for this home from this template (prevents duplicates when re-running generate)
+      if (existingTemplateIds.has(template.id)) continue;
       // Determine frequency based on rules
       let frequency = template.baseFrequency;
 
@@ -383,6 +393,10 @@ export async function POST(request: NextRequest) {
       }
 
       if (appliesToHome) {
+        // Skip if we already added a task with the same name this run (e.g. two templates both "Smoke detector check")
+        if (personalizedTasks.some((t) => t.name.toLowerCase().trim() === template.name.toLowerCase().trim())) {
+          continue;
+        }
         const nextDueDate = calculateNextDueDate(frequency);
 
         // Ensure category and frequency match Prisma enums exactly
@@ -524,9 +538,21 @@ export async function POST(request: NextRequest) {
     });
     console.log(`[33.6] Climate recommendation tasks: ${climateTasksForDb.length}`);
 
-    console.log("[34] Combining all tasks...");
-    const allTasks = [...personalizedTasks, ...complianceTasksForDb, ...climateTasksForDb];
-    console.log(`[35] Total tasks to create: ${allTasks.length} (${personalizedTasks.length} regular + ${complianceTasksForDb.length} compliance + ${climateTasksForDb.length} climate)`);
+    console.log("[34] Deduplicating compliance and climate tasks by name...");
+    const namesToCreate = new Set(personalizedTasks.map((t: { name: string }) => t.name.toLowerCase().trim()));
+    const complianceFiltered = complianceTasksForDb.filter((task: { name: string }) => {
+      const name = task.name.toLowerCase().trim();
+      return !existingNames.has(name) && !namesToCreate.has(name);
+    });
+    complianceFiltered.forEach((t: { name: string }) => namesToCreate.add(t.name.toLowerCase().trim()));
+    const climateFiltered = climateTasksForDb.filter((rec: { name: string }) => {
+      const name = (rec.name || "").toLowerCase().trim();
+      return !existingNames.has(name) && !namesToCreate.has(name);
+    });
+
+    console.log("[35] Combining all tasks...");
+    const allTasks = [...personalizedTasks, ...complianceFiltered, ...climateFiltered];
+    console.log(`[36] Total tasks to create: ${allTasks.length} (${personalizedTasks.length} regular + ${complianceFiltered.length} compliance + ${climateFiltered.length} climate; skipped ${complianceTasksForDb.length - complianceFiltered.length} compliance, ${climateTasksForDb.length - climateFiltered.length} climate duplicates)`);
 
     // Validate we have tasks to create
     if (allTasks.length === 0) {
@@ -537,7 +563,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("[36] Validating task enum values...");
+    console.log("[37] Validating task enum values...");
     // Final validation: ensure all tasks have valid enum values
     const invalidTasks = allTasks.filter((task: { category: string; frequency: string }) => {
       const categoryValid = validCategories.includes(task.category);
@@ -560,9 +586,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.log("[37] All tasks validated successfully");
+    console.log("[38] All tasks validated successfully");
 
-    console.log("[38] Starting database transaction to create tasks...");
+    console.log("[39] Starting database transaction to create tasks...");
     // Create tasks in database
     let createdTasks;
     try {
@@ -576,7 +602,7 @@ export async function POST(request: NextRequest) {
           });
         })
       );
-      console.log(`[39] Database transaction completed. Created ${createdTasks.length} tasks`);
+      console.log(`[40] Database transaction completed. Created ${createdTasks.length} tasks`);
     } catch (dbError: unknown) {
       const errMsg = dbError instanceof Error ? dbError.message : String(dbError);
       console.error("[ERROR] Database error creating tasks:", dbError);
@@ -601,7 +627,7 @@ export async function POST(request: NextRequest) {
 
     const endTime = Date.now();
     const duration = endTime - startTime;
-    console.log(`[40] Task generation completed successfully in ${duration}ms`);
+    console.log(`[41] Task generation completed successfully in ${duration}ms`);
     
     return NextResponse.json(
       {

@@ -120,3 +120,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Page loading: car driving to house */
+@keyframes drive-to-house {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(200px);
+  }
+}
+
+.animate-drive-to-house {
+  animation: drive-to-house 1.8s ease-in-out infinite;
+}

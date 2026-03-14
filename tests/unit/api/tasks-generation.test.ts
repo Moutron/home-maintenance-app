@@ -68,6 +68,7 @@ describe("Task Generation API", () => {
         ...testData.home,
         systems: [],
       });
+      mockPrisma.maintenanceTask.findMany.mockResolvedValue([]);
       mockPrisma.taskTemplate.findMany.mockResolvedValue([
         {
           id: "template1",
@@ -165,6 +166,7 @@ describe("Task Generation API", () => {
         exteriorFeatures: [],
         interiorFeatures: [],
       });
+      mockPrisma.maintenanceTask.findMany.mockResolvedValue([]);
       mockPrisma.maintenanceTask.create.mockResolvedValue({
         id: "task1",
         homeId: testData.home.id,

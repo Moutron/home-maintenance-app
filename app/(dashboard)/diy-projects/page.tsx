@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Hammer, Filter } from "lucide-react";
+import { PageLoading } from "@/components/page-loading";
 import Link from "next/link";
 import {
   Dialog,
@@ -147,10 +148,7 @@ export default function DiyProjectsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading projects...</p>
-        </div>
+        <PageLoading message="Loading projects..." />
       </div>
     );
   }

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { User, Mail, Calendar, CreditCard, Bell } from "lucide-react";
+import { PageLoading } from "@/components/page-loading";
 import { PushNotificationSubscription } from "@/components/push-notification-subscription";
 
 export default function SettingsPage() {
@@ -24,11 +25,7 @@ export default function SettingsPage() {
   }, []);
 
   if (!isLoaded) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading...</p>
-      </div>
-    );
+    return <PageLoading message="Loading settings..." />;
   }
 
   return (

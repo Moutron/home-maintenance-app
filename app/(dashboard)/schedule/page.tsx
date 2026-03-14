@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { PageLoading } from "@/components/page-loading";
 import { Calendar, Filter, Download } from "lucide-react";
 
 type Task = {
@@ -167,11 +168,7 @@ export default function SchedulePage() {
   ];
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading schedule...</p>
-      </div>
-    );
+    return <PageLoading message="Loading schedule..." />;
   }
 
   return (

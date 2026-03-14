@@ -20,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { PageLoading } from "@/components/page-loading";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type Task = {
@@ -118,11 +119,7 @@ export default function CalendarPage() {
   const selectedDateTasks = getTasksForDate(selectedDate);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading calendar...</p>
-      </div>
-    );
+    return <PageLoading message="Loading calendar..." />;
   }
 
   return (

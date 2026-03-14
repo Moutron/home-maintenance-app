@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageLoading } from "@/components/page-loading";
 import { Shield, FileText, AlertTriangle, CheckCircle2, Plus } from "lucide-react";
 
 type LocalRegulation = {
@@ -165,11 +166,7 @@ export default function CompliancePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading compliance requirements...</p>
-      </div>
-    );
+    return <PageLoading message="Loading compliance requirements..." />;
   }
 
   return (

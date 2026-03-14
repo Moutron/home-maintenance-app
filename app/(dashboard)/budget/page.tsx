@@ -32,6 +32,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { BudgetPlanForm } from "@/components/budget-plan-form";
+import { PageLoading } from "@/components/page-loading";
 import Link from "next/link";
 
 type BudgetData = {
@@ -208,11 +209,7 @@ export default function BudgetPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p>Loading budget data...</p>
-      </div>
-    );
+    return <PageLoading message="Loading budget data..." />;
   }
 
   if (!budgetData) {

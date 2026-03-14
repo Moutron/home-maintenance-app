@@ -58,6 +58,15 @@ describe("Dashboard API - Comprehensive Mutation Tests", () => {
       clerkId: "user_test123",
       email: "test@example.com",
     });
+    mockPrisma.home.findMany.mockResolvedValue([]);
+    mockPrisma.vehicle.findMany.mockResolvedValue([]);
+    mockPrisma.maintenanceTask.findMany.mockResolvedValue([]);
+    mockPrisma.maintenanceHistory.findMany.mockResolvedValue([]);
+    mockPrisma.appliance.findMany.mockResolvedValue([]);
+    mockPrisma.exteriorFeature.findMany.mockResolvedValue([]);
+    mockPrisma.interiorFeature.findMany.mockResolvedValue([]);
+    mockPrisma.homeSystem.findMany.mockResolvedValue([]);
+    mockPrisma.completedTask.findMany.mockResolvedValue([]);
   });
 
   describe("Date Boundary Tests", () => {

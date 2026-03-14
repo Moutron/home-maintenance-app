@@ -85,6 +85,7 @@ describe("Tasks API - Edge Cases", () => {
       clerkId: "user_test123",
       email: "test@example.com",
     });
+    mockPrisma.vehicle.findMany.mockResolvedValue([]);
   });
 
   describe("GET /api/tasks - Edge Cases", () => {
