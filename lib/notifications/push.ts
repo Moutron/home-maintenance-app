@@ -1,15 +1,16 @@
-import OneSignal from "onesignal-node";
+/**
+ * OneSignal push notifications via REST API (no onesignal-node dependency).
+ * @see https://documentation.onesignal.com/reference/create-notification
+ */
 
-// Lazy-load OneSignal client to avoid build-time errors
-function getOneSignalClient() {
-  const appId = process.env.ONESIGNAL_APP_ID;
+const ONESIGNAL_API = "https://api.onesignal.com/notifications";
+
+function getAuthHeader(): string {
   const restApiKey = process.env.ONESIGNAL_REST_API_KEY;
-
-  if (!appId || !restApiKey) {
-    throw new Error("OneSignal credentials not configured");
-  }
-
-  return new OneSignal.Client(appId, restApiKey);
+  if (!restApiKey) throw new Error("OneSignal REST API key not configured");
+  // OneSignal expects Basic auth with empty username and REST API Key as password
+  const encoded = Buffer.from(`:${restApiKey}`).toString("base64");
+  return `Basic ${encoded}`;
 }
 
 export interface PushNotificationData {
@@ -19,6 +20,34 @@ export interface PushNotificationData {
   icon?: string;
   badge?: string;
   data?: Record<string, unknown>;
+}
+
+type OneSignalNotificationPayload = {
+  app_id: string;
+  contents: { en: string };
+  headings: { en: string };
+  include_player_ids?: string[];
+  included_segments?: string[];
+  url?: string;
+  chrome_web_icon?: string;
+  chrome_web_badge?: string;
+  data?: Record<string, unknown>;
+};
+
+async function createNotification(payload: OneSignalNotificationPayload): Promise<void> {
+  const res = await fetch(ONESIGNAL_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: getAuthHeader(),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`OneSignal API error ${res.status}: ${text}`);
+  }
 }
 
 /**
@@ -34,15 +63,10 @@ export async function sendPushNotification(
   }
 
   try {
-    const client = getOneSignalClient();
-    
-    await client.createNotification({
-      contents: {
-        en: notification.message,
-      },
-      headings: {
-        en: notification.title,
-      },
+    await createNotification({
+      app_id: process.env.ONESIGNAL_APP_ID!,
+      contents: { en: notification.message },
+      headings: { en: notification.title },
       include_player_ids: [playerId],
       url: notification.url,
       chrome_web_icon: notification.icon,
@@ -102,15 +126,10 @@ export async function sendBulkPushNotifications(
   }
 
   try {
-    const client = getOneSignalClient();
-    
-    await client.createNotification({
-      contents: {
-        en: notification.message,
-      },
-      headings: {
-        en: notification.title,
-      },
+    await createNotification({
+      app_id: process.env.ONESIGNAL_APP_ID!,
+      contents: { en: notification.message },
+      headings: { en: notification.title },
       include_player_ids: playerIds,
       url: notification.url,
       chrome_web_icon: notification.icon,
@@ -135,16 +154,11 @@ export async function sendBroadcastPushNotification(
   }
 
   try {
-    const client = getOneSignalClient();
-    
-    await client.createNotification({
-      contents: {
-        en: notification.message,
-      },
-      headings: {
-        en: notification.title,
-      },
-      included_segments: ["All"], // Send to all subscribed users
+    await createNotification({
+      app_id: process.env.ONESIGNAL_APP_ID!,
+      contents: { en: notification.message },
+      headings: { en: notification.title },
+      included_segments: ["All"],
       url: notification.url,
       chrome_web_icon: notification.icon,
       chrome_web_badge: notification.badge,
@@ -167,10 +181,10 @@ export function createTaskReminderPush(
 ): PushNotificationData {
   const isOverdue = daysUntilDue < 0;
   const isDueToday = daysUntilDue === 0;
-  
+
   let title: string;
   let message: string;
-  
+
   if (isOverdue) {
     title = "⚠️ Overdue Task";
     message = `${taskName} is ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) !== 1 ? "s" : ""} overdue at ${homeAddress}`;
@@ -205,7 +219,7 @@ export function createWarrantyExpirationPush(
   homeAddress: string
 ): PushNotificationData {
   const isExpiringSoon = daysUntilExpiry <= 7;
-  
+
   const title = isExpiringSoon ? "🔴 Warranty Expiring Soon" : "⚠️ Warranty Expiring";
   const message = `${warrantyName} warranty expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""} at ${homeAddress}`;
 
@@ -221,4 +235,3 @@ export function createWarrantyExpirationPush(
     },
   };
 }
-
