@@ -223,7 +223,16 @@ export async function POST(request: NextRequest) {
 
     console.log("[24] Starting template personalization loop...");
     // Filter and personalize templates based on home data
-    const personalizedTasks = [];
+    const personalizedTasks: Array<{
+      homeId: string;
+      templateId: string;
+      name: string;
+      description: string | null;
+      category: "HVAC" | "PLUMBING" | "EXTERIOR" | "STRUCTURAL" | "LANDSCAPING" | "APPLIANCE" | "SAFETY" | "ELECTRICAL" | "OTHER";
+      frequency: "WEEKLY" | "MONTHLY" | "QUARTERLY" | "BIANNUAL" | "ANNUAL" | "SEASONAL" | "AS_NEEDED";
+      nextDueDate: Date;
+      costEstimate: number | null;
+    }> = [];
     let templateIndex = 0;
 
     for (const template of templates) {
@@ -598,7 +607,10 @@ export async function POST(request: NextRequest) {
             console.log(`[38.${index}] Creating task ${index + 1}/${allTasks.length}: ${task.name}`);
           }
           return prisma.maintenanceTask.create({
-            data: task,
+            data: {
+              ...task,
+              description: task.description ?? "",
+            },
           });
         })
       );
