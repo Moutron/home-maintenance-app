@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/ensure-db-url.js && next build",
+    "build": "node scripts/ensure-db-url.js && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
